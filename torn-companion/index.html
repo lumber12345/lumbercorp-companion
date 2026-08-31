@@ -1772,12 +1772,17 @@ function init(){
   document.addEventListener("click", e => {
     const a = e.target.closest("a.act");
     if(!a) return;
-    if(isEmbedded()){
-      e.preventDefault();
-      const label = (a.title || a.textContent || "Link").trim();
-      copyText(a.href);
-      toast("⚠️ This preview blocks external links. Copied the \u201C" + label + "\u201D URL \u2014 download index.html and open it in your browser to launch Torn pages directly.");
-    }
+    if(!isEmbedded()) return; // real browser: let target="_blank" open normally
+    e.preventDefault();
+    const label = (a.title || a.textContent || "Link").trim();
+    const url = a.href;
+    // try to open anyway (some embedded contexts allow popups)
+    let opened = false;
+    try{ const w = window.open(url, "_blank", "noopener"); opened = !!w; if(opened && w.opener) w.opener = null; }catch(err){}
+    copyText(url);
+    toast(opened
+      ? "↗ Opening " + label + " in a new tab…"
+      : "⚠️ This preview can't open Torn links. Copied the " + label + " URL: " + url + " — open the app in your own browser (or the deployed site) to launch it directly.");
   });
 
   // settings handlers
