@@ -173,6 +173,7 @@
     background:var(--card);border:1px solid var(--border);border-radius:13px;
     padding:13px 8px;cursor:pointer;text-align:center;transition:.15s;text-decoration:none;color:var(--text);
     display:flex;flex-direction:column;align-items:center;gap:7px;
+    font-family:inherit;font-size:inherit;width:100%;
   }
   .act:hover{border-color:var(--border2);background:var(--card2);transform:translateY(-2px)}
   .act:active{transform:translateY(0) scale(.97)}
@@ -632,7 +633,8 @@ const DEFAULT_ACTIONS = [
   {name:"Gym",       url:"https://www.torn.com/gym.php",              icon:"🏋️"},
   {name:"Items",     url:"https://www.torn.com/item.php",             icon:"🎒"},
   {name:"City",      url:"https://www.torn.com/city.php",             icon:"🏙️"},
-  {name:"Travel",    url:"https://www.torn.com/travel.php",           icon:"✈️"},
+  {name:"Flight",    tab:"flight", icon:"✈️"},
+  {name:"Travel",    url:"https://www.torn.com/travel.php",           icon:"🛫"},
   {name:"Bazaar",    url:"https://www.torn.com/bazaar.php",           icon:"🛒"},
   {name:"Faction",   url:"https://www.torn.com/factions.php",         icon:"🏰"},
   {name:"Company",   url:"https://www.torn.com/companies.php",        icon:"🏢"},
@@ -971,11 +973,18 @@ function renderBars(){
 
 function renderActions(){
   const acts = DEFAULT_ACTIONS.concat((settings.customActions||[]).map(a => ({name:a.name, url:a.url, icon:"🔗"})));
-  $("actions").innerHTML = acts.map(a => `
-    <a class="act" href="${a.url}" target="_blank" rel="noopener" title="${a.name}">
+  $("actions").innerHTML = acts.map(a => {
+    if(a.tab){
+      return `<button class="act" data-goto="${a.tab}" title="${a.name}">
+        <span class="ic">${a.icon}</span>
+        <span class="nm">${a.name}</span>
+      </button>`;
+    }
+    return `<a class="act" href="${a.url}" target="_blank" rel="noopener" title="${a.name}">
       <span class="ic">${a.icon}</span>
       <span class="nm">${a.name}</span>
-    </a>`).join("");
+    </a>`;
+  }).join("");
 }
 
 function renderCooldowns(){
@@ -1730,6 +1739,14 @@ async function loadItemsLive(){
   return items;
 }
 
+function switchTab(name){
+  document.querySelectorAll(".tab").forEach(x => x.classList.toggle("active", x.dataset.tab === name));
+  document.querySelectorAll(".panel").forEach(p => p.classList.toggle("active", p.dataset.panel === name));
+  if(name === "alerts"){ state.unread = 0; renderAlertBadge(); }
+  if(name === "items") $("searchInput").focus();
+  window.scrollTo({top:0, behavior:"smooth"});
+}
+
 /* ============================== INIT & EVENTS ============================== */
 function init(){
   applyTheme();
@@ -1870,13 +1887,14 @@ function init(){
 
   // tab switching
   document.querySelectorAll(".tab").forEach(t => {
-    t.addEventListener("click", () => {
-      const name = t.dataset.tab;
-      document.querySelectorAll(".tab").forEach(x => x.classList.toggle("active", x === t));
-      document.querySelectorAll(".panel").forEach(p => p.classList.toggle("active", p.dataset.panel === name));
-      if(name === "alerts"){ state.unread = 0; renderAlertBadge(); }
-      if(name === "items") $("searchInput").focus();
-    });
+    t.addEventListener("click", () => switchTab(t.dataset.tab));
+  });
+
+  // in-app quick actions (e.g. Flight) — delegated so re-renders keep working
+  document.addEventListener("click", e => {
+    const b = e.target.closest("[data-goto]");
+    if(!b) return;
+    switchTab(b.dataset.goto);
   });
 
   // lazy-load live items when user starts searching in live mode
