@@ -289,43 +289,6 @@
   .outlist{margin-top:8px;font-size:10.5px;color:var(--faint);line-height:1.7}
   .outlist b{color:var(--muted);font-weight:600}
 
-  /* ---------- casino ---------- */
-  .games{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-  .game{
-    background:var(--card);border:1px solid var(--border);border-radius:13px;padding:15px 10px;
-    cursor:pointer;text-align:center;transition:.15s;text-decoration:none;color:var(--text);
-    display:flex;flex-direction:column;align-items:center;gap:7px;
-  }
-  .game:hover{border-color:var(--border2);background:var(--card2);transform:translateY(-2px)}
-  .game:active{transform:translateY(0) scale(.97)}
-  .game .ic{font-size:26px;line-height:1}
-  .game .nm{font-weight:700;font-size:13px}
-  .game .meta{font-size:10.5px;color:var(--faint);line-height:1.35}
-  .game .meta .tk{color:var(--warn)}
-  @media(max-width:560px){.games{grid-template-columns:repeat(2,1fr)}}
-
-  .wheels{display:grid;gap:10px;grid-template-columns:repeat(3,1fr)}
-  .wheel{background:var(--card);border:1px solid var(--border);border-radius:13px;padding:15px 14px;transition:.2s}
-  .wheel.spun{opacity:.55}
-  .wheel .whead{display:flex;align-items:center;gap:9px}
-  .wheel .wic{font-size:24px;line-height:1}
-  .wheel .wname{font-weight:800;font-size:14px}
-  .wheel .wentry{font-size:11.5px;color:var(--muted);margin-top:8px}
-  .wheel .wentry b{color:var(--text);font-variant-numeric:tabular-nums}
-  .wheel .wtimer{margin-top:10px;padding:9px 10px;border-radius:9px;background:var(--bg);border:1px solid var(--border)}
-  .wheel .wtimer .k{font-size:10px;color:var(--faint);text-transform:uppercase;letter-spacing:.6px}
-  .wheel .wtimer .v{font-size:18px;font-weight:800;font-variant-numeric:tabular-nums;margin-top:2px}
-  .wheel .wtimer .v.ready{color:var(--ok)}
-  .wheel .wbtn{display:flex;gap:8px;margin-top:10px}
-  .wheel .wbtn a{
-    flex:1;display:block;text-align:center;background:var(--accent);color:#fff;border-radius:9px;
-    padding:9px;font-size:12.5px;font-weight:700;text-decoration:none;transition:.15s;
-  }
-  .wheel .wbtn a:hover{background:var(--accent2)}
-  .wheel .wbtn .btn{margin:0;width:auto;padding:9px 12px;font-size:12px}
-  @media(max-width:560px){.wheels{grid-template-columns:1fr}}
-
-
   /* ---------- faction ---------- */
   .faction{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:15px 16px}
   .faction .fhead{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
@@ -472,7 +435,6 @@
   <nav class="tabbar" id="tabbar">
     <button class="tab active" data-tab="actions">⚡ Actions</button>
     <button class="tab" data-tab="flight">✈️ Flight</button>
-    <button class="tab" data-tab="casino">🎰 Casino</button>
     <button class="tab" data-tab="cooldowns">⏱️ Cooldowns</button>
     <button class="tab" data-tab="stats">📈 Stats</button>
     <button class="tab" data-tab="items">🔍 Items</button>
@@ -524,17 +486,6 @@
       <div id="yataMeta">Loading foreign stock…</div>
     </div>
     <div class="destlist" id="destlist"></div>
-  </section>
-
-  <section class="panel" data-panel="casino">
-    <h2 class="sec">Casino Games</h2>
-    <div class="games" id="games"></div>
-    <h2 class="sec">Spin The Wheel</h2>
-    <div class="restockbar">
-      <span class="ic">🕒</span>
-      <div>Each wheel can be spun <b>once per day</b> and resets at <b>New Day (00:00 TCT / UTC)</b>. Next reset in <b id="newDayCount">—</b>.</div>
-    </div>
-    <div class="wheels" id="wheels"></div>
   </section>
 
   <section class="panel" data-panel="cooldowns">
@@ -690,7 +641,7 @@ const DEFAULT_ACTIONS = [
   {name:"Stocks",    url:"https://www.torn.com/stockexchange.php",    icon:"📈"},
   {name:"Casino",    url:"https://www.torn.com/casino.php",           icon:"🎰"},
   {name:"Points",    url:"https://www.torn.com/points.php",           icon:"💎"},
-  {name:"Racing",    url:"https://www.torn.com/loader.php?sid=racing", icon:"🏎️"},
+  {name:"Racing",    url:"https://www.torn.com/page.php?sid=racing", icon:"🏎️"},
   {name:"Auction",   url:"https://www.torn.com/auction.php",          icon:"🔨"},
   {name:"Education", url:"https://www.torn.com/education.php",        icon:"🎓"},
 ];
@@ -1504,86 +1455,6 @@ function updateNextTick(){
 }
 
 
-/* ---------- casino tab ---------- */
-const CASINO_GAMES = [
-  {name:"Bookie",           icon:"🏈", url:"https://www.torn.com/bookie.php",                    note:"Level 2+ · no token"},
-  {name:"Lottery",          icon:"🎟️", url:"https://www.torn.com/lottery.php",                  note:"Level 3+ · 1 token"},
-  {name:"Blackjack",        icon:"🃏", url:"https://www.torn.com/page.php?sid=blackjack",       note:"Level 4+ · 1 token"},
-  {name:"Poker",            icon:"♠️", url:"https://www.torn.com/page.php?sid=poker",            note:"Level 5+ · no token"},
-  {name:"Russian Roulette", icon:"🔫", url:"https://www.torn.com/page.php?sid=r-roulete",       note:"Level 6+ · no token"},
-  {name:"Spin The Wheel",   icon:"🌀", url:"https://www.torn.com/page.php?sid=spin-the-wheel",  note:"Level 7+ · no token"},
-  {name:"Slots",            icon:"🎰", url:"https://www.torn.com/page.php?sid=slots",           note:"1 token"},
-  {name:"Roulette",         icon:"🎡", url:"https://www.torn.com/page.php?sid=roulette",        note:"1 token"},
-  {name:"High-Low",         icon:"🔺", url:"https://www.torn.com/page.php?sid=high-low",        note:"1 token"},
-  {name:"Keno",             icon:"🎱", url:"https://www.torn.com/page.php?sid=keno",            note:"1 token"},
-  {name:"Craps",            icon:"🎲", url:"https://www.torn.com/page.php?sid=craps",           note:"1 token"},
-];
-
-const WHEELS = [
-  {key:"lame",       name:"Wheel of Lame",       entry:1000,    icon:"🤡"},
-  {key:"mediocrity", name:"Wheel of Mediocrity", entry:50000,   icon:"😐"},
-  {key:"awesome",    name:"Wheel of Awesome",    entry:1000000, icon:"🌟"},
-];
-const WHEEL_URL = "https://www.torn.com/page.php?sid=spin-the-wheel";
-
-let wheelSpins = store.get("tc_wheels", {}); // { lame: "2026-08-31", ... }
-function todayUTC(){ return new Date().toISOString().slice(0,10); }
-
-function secsToNewDay(){
-  const now = new Date();
-  const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()+1));
-  return Math.max(0, Math.floor((next - now)/1000));
-}
-
-function renderCasino(){
-  $("games").innerHTML = CASINO_GAMES.map(g => `
-    <a class="game" href="${g.url}" target="_blank" rel="noopener" title="${g.name}">
-      <span class="ic">${g.icon}</span>
-      <span class="nm">${g.name}</span>
-      <span class="meta">${g.note}</span>
-    </a>`).join("");
-  renderWheels();
-}
-
-function renderWheels(){
-  const t = todayUTC();
-  $("wheels").innerHTML = WHEELS.map(w => {
-    const spun = wheelSpins[w.key] === t;
-    return `
-      <div class="wheel${spun ? " spun" : ""}">
-        <div class="whead"><span class="wic">${w.icon}</span><span class="wname">${w.name}</span></div>
-        <div class="wentry">Entry: <b>${fmtMoney(w.entry)}</b> / spin</div>
-        <div class="wtimer">
-          <div class="k">${spun ? "Spun today · resets in" : "Resets in (New Day)"}</div>
-          <div class="v" id="wheel-${w.key}">—</div>
-        </div>
-        <div class="wbtn">
-          <a href="${WHEEL_URL}" target="_blank" rel="noopener">Open</a>
-          <button class="btn ghost" data-wheel="${w.key}">${spun ? "Undo" : "Mark spun"}</button>
-        </div>
-      </div>`;
-  }).join("");
-  document.querySelectorAll("[data-wheel]").forEach(b => {
-    b.onclick = () => {
-      const k = b.dataset.wheel, t = todayUTC();
-      if(wheelSpins[k] === t) delete wheelSpins[k]; else wheelSpins[k] = t;
-      store.set("tc_wheels", wheelSpins);
-      renderWheels();
-    };
-  });
-}
-
-function updateWheelTimers(){
-  const s = secsToNewDay();
-  const nd = $("newDayCount");
-  if(nd) nd.textContent = fmtDur(s);
-  WHEELS.forEach(w => {
-    const e = $("wheel-" + w.key);
-    if(e) e.textContent = fmtDur(s);
-  });
-}
-
-
 /* ---------- ticker (every second) ---------- */
 function tick(){
   const now = Date.now();
@@ -1616,7 +1487,6 @@ function tick(){
   updateClock();
   updateFlightTick();
   updateNextTick();
-  updateWheelTimers();
 }
 
 function updateClock(){
@@ -1882,10 +1752,10 @@ function init(){
     if(e.key === "Escape") closeSettings();
   });
 
-  // External links (quick actions, casino games, wheels) are blocked in the
+  // External links (quick actions) are blocked in the
   // sandboxed preview. When blocked, copy the URL and explain instead.
   document.addEventListener("click", e => {
-    const a = e.target.closest("a.act, a.game, .wbtn a");
+    const a = e.target.closest("a.act");
     if(!a) return;
     if(isEmbedded()){
       e.preventDefault();
@@ -1961,7 +1831,6 @@ function init(){
   renderAll();
   renderFlight();
   renderFlightStatus();
-  renderCasino();
   setInterval(tick, 1000);
   fetchYata();
   setInterval(() => fetchYata(), 60000);
