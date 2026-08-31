@@ -388,6 +388,17 @@
     max-width:92vw;z-index:200;text-align:center;
   }
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  /* ---------- return-to-app fab ---------- */
+  .returnfab{
+    position:fixed; right:16px; bottom:20px; z-index:300;
+    background:linear-gradient(135deg,var(--accent),#7a5cff); color:#fff; border:none;
+    border-radius:99px; padding:12px 18px; font-size:13.5px; font-weight:700;
+    cursor:pointer; box-shadow:var(--shadow); display:none; align-items:center; gap:8px;
+    transition:.15s; animation:fade .25s ease;
+  }
+  .returnfab:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(79,140,255,.45)}
+  .returnfab:active{transform:scale(.96)}
 </style>
 </head>
 <body data-theme="dark">
@@ -525,6 +536,7 @@
 
 <!-- Settings modal -->
 <div class="toast" id="toast"></div>
+<button class="returnfab" id="returnFab">🔁 Return to app</button>
 <div class="overlay" id="overlay">
   <div class="sheet">
     <h3>⚙️ Settings <button class="x" id="closeSettings">✕</button></h3>
@@ -1642,6 +1654,16 @@ function toast(msg){
   toastTimer = setTimeout(() => t.classList.remove("show"), 4000);
 }
 
+/* ---- return-to-app fab ---- */
+function showReturnFab(){
+  const b = $("returnFab");
+  if(b) b.style.display = "inline-flex";
+}
+function hideReturnFab(){
+  const b = $("returnFab");
+  if(b) b.style.display = "none";
+}
+
 /* ---- PWA install ---- */
 let deferredPrompt = null;
 
@@ -1767,22 +1789,34 @@ function init(){
     if(e.key === "Escape") closeSettings();
   });
 
-  // External links (quick actions) are blocked in the
-  // sandboxed preview. When blocked, copy the URL and explain instead.
+  // External links (quick actions). Open Torn in a NEW tab so the app is never
+  // left behind, then surface a floating "Return to app" button.
   document.addEventListener("click", e => {
     const a = e.target.closest("a.act");
     if(!a) return;
-    if(!isEmbedded()) return; // real browser: let target="_blank" open normally
-    e.preventDefault();
     const label = (a.title || a.textContent || "Link").trim();
     const url = a.href;
-    // try to open anyway (some embedded contexts allow popups)
-    let opened = false;
-    try{ const w = window.open(url, "_blank", "noopener"); opened = !!w; if(opened && w.opener) w.opener = null; }catch(err){}
-    copyText(url);
-    toast(opened
-      ? "↗ Opening " + label + " in a new tab…"
-      : "⚠️ This preview can't open Torn links. Copied the " + label + " URL: " + url + " — open the app in your own browser (or the deployed site) to launch it directly.");
+
+    if(isEmbedded()){
+      // Sandboxed preview: can't leave. Try to open, then explain.
+      e.preventDefault();
+      let opened = false;
+      try{ const w = window.open(url, "_blank", "noopener"); opened = !!w; if(opened && w.opener) w.opener = null; }catch(err){}
+      copyText(url);
+      toast(opened
+        ? "↗ Opening " + label + " in a new tab…"
+        : "⚠️ This preview can't open Torn links. Copied the " + label + " URL: " + url + " — open the app in your own browser (or the deployed site) to launch it directly.");
+      return;
+    }
+
+    // Real browser / installed app: keep the app open, open Torn alongside.
+    e.preventDefault();
+    try{
+      const w = window.open(url, "_blank", "noopener");
+      if(w && w.opener) w.opener = null;
+    }catch(err){}
+    showReturnFab();
+    toast("↗ Opened " + label + " in a new tab. When you're done, tap \u201C🔁 Return to app\u201D (or switch back to this tab).");
   });
 
   // settings handlers
@@ -1901,6 +1935,20 @@ function init(){
     if(!b) return;
     switchTab(b.dataset.goto);
   });
+
+  // "Return to app" fab — bring the app back into focus
+  $("returnFab").addEventListener("click", () => {
+    try{ window.focus(); }catch(e){}
+    hideReturnFab();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    toast("👋 Welcome back to LumberCorp Companion.");
+  });
+
+  // When the user switches back to the app tab, the return is complete.
+  document.addEventListener("visibilitychange", () => {
+    if(!document.hidden) hideReturnFab();
+  });
+  window.addEventListener("focus", () => { if(!document.hidden) hideReturnFab(); });
 
   // lazy-load live items when user starts searching in live mode
   $("searchInput").addEventListener("focus", async () => {
