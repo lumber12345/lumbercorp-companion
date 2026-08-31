@@ -1510,11 +1510,11 @@ const CASINO_GAMES = [
   {name:"Lottery",          icon:"🎟️", url:"https://www.torn.com/lottery.php",                  note:"Level 3+ · 1 token"},
   {name:"Blackjack",        icon:"🃏", url:"https://www.torn.com/page.php?sid=blackjack",       note:"Level 4+ · 1 token"},
   {name:"Poker",            icon:"♠️", url:"https://www.torn.com/page.php?sid=poker",            note:"Level 5+ · no token"},
-  {name:"Russian Roulette", icon:"🔫", url:"https://www.torn.com/page.php?sid=russianroulette", note:"Level 6+ · no token"},
-  {name:"Spin The Wheel",   icon:"🌀", url:"https://www.torn.com/page.php?sid=wheel",           note:"Level 7+ · no token"},
+  {name:"Russian Roulette", icon:"🔫", url:"https://www.torn.com/page.php?sid=r-roulete",       note:"Level 6+ · no token"},
+  {name:"Spin The Wheel",   icon:"🌀", url:"https://www.torn.com/page.php?sid=spin-the-wheel",  note:"Level 7+ · no token"},
   {name:"Slots",            icon:"🎰", url:"https://www.torn.com/page.php?sid=slots",           note:"1 token"},
   {name:"Roulette",         icon:"🎡", url:"https://www.torn.com/page.php?sid=roulette",        note:"1 token"},
-  {name:"High-Low",         icon:"🔺", url:"https://www.torn.com/page.php?sid=highlow",         note:"1 token"},
+  {name:"High-Low",         icon:"🔺", url:"https://www.torn.com/page.php?sid=high-low",        note:"1 token"},
   {name:"Keno",             icon:"🎱", url:"https://www.torn.com/page.php?sid=keno",            note:"1 token"},
   {name:"Craps",            icon:"🎲", url:"https://www.torn.com/page.php?sid=craps",           note:"1 token"},
 ];
@@ -1524,7 +1524,7 @@ const WHEELS = [
   {key:"mediocrity", name:"Wheel of Mediocrity", entry:50000,   icon:"😐"},
   {key:"awesome",    name:"Wheel of Awesome",    entry:1000000, icon:"🌟"},
 ];
-const WHEEL_URL = "https://www.torn.com/page.php?sid=wheel";
+const WHEEL_URL = "https://www.torn.com/page.php?sid=spin-the-wheel";
 
 let wheelSpins = store.get("tc_wheels", {}); // { lame: "2026-08-31", ... }
 function todayUTC(){ return new Date().toISOString().slice(0,10); }
