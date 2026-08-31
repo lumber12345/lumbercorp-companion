@@ -1,5 +1,5 @@
 /* LumberCorp Companion service worker — offline cache + installability */
-const CACHE = "lumbercorp-v1";
+const CACHE = "lumbercorp-v2";
 const ASSETS = [
   "./",
   "./index.html",

@@ -388,17 +388,6 @@
     max-width:92vw;z-index:200;text-align:center;
   }
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
-
-  /* ---------- return-to-app fab ---------- */
-  .returnfab{
-    position:fixed; right:16px; bottom:20px; z-index:300;
-    background:linear-gradient(135deg,var(--accent),#7a5cff); color:#fff; border:none;
-    border-radius:99px; padding:12px 18px; font-size:13.5px; font-weight:700;
-    cursor:pointer; box-shadow:var(--shadow); display:none; align-items:center; gap:8px;
-    transition:.15s; animation:fade .25s ease;
-  }
-  .returnfab:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(79,140,255,.45)}
-  .returnfab:active{transform:scale(.96)}
 </style>
 </head>
 <body data-theme="dark">
@@ -536,7 +525,6 @@
 
 <!-- Settings modal -->
 <div class="toast" id="toast"></div>
-<button class="returnfab" id="returnFab">🔁 Return to app</button>
 <div class="overlay" id="overlay">
   <div class="sheet">
     <h3>⚙️ Settings <button class="x" id="closeSettings">✕</button></h3>
@@ -1654,16 +1642,6 @@ function toast(msg){
   toastTimer = setTimeout(() => t.classList.remove("show"), 4000);
 }
 
-/* ---- return-to-app fab ---- */
-function showReturnFab(){
-  const b = $("returnFab");
-  if(b) b.style.display = "inline-flex";
-}
-function hideReturnFab(){
-  const b = $("returnFab");
-  if(b) b.style.display = "none";
-}
-
 /* ---- PWA install ---- */
 let deferredPrompt = null;
 
@@ -1717,21 +1695,6 @@ function initPWA(){
 
   // show the button if installable but the prompt hasn't fired yet
   if(!isStandalone()) showInstallBtn();
-}
-
-/* ---- environment helpers ---- */
-function isEmbedded(){
-  try{ return window.self !== window.top; }catch(e){ return true; }
-}
-function copyText(txt){
-  try{ if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(txt); return true; } }catch(e){}
-  try{
-    const ta = document.createElement("textarea");
-    ta.value = txt; ta.style.cssText = "position:fixed;top:0;left:0;opacity:0";
-    document.body.appendChild(ta); ta.focus(); ta.select();
-    const ok = document.execCommand("copy");
-    ta.remove(); return ok;
-  }catch(e){ return false; }
 }
 
 function renderCustomActionsHint(){
@@ -1789,34 +1752,20 @@ function init(){
     if(e.key === "Escape") closeSettings();
   });
 
-  // External links (quick actions). Open Torn in a NEW tab so the app is never
-  // left behind, then surface a floating "Return to app" button.
+  // External links (quick actions). The anchor's native target="_blank"
+  // opens Torn in a new tab and leaves the app open behind it. Returning is
+  // just switching back to this tab (desktop) or the OS back / "Return to app"
+  // gesture (mobile / installed PWA). Tell the user that clearly.
   document.addEventListener("click", e => {
     const a = e.target.closest("a.act");
     if(!a) return;
     const label = (a.title || a.textContent || "Link").trim();
-    const url = a.href;
-
-    if(isEmbedded()){
-      // Sandboxed preview: can't leave. Try to open, then explain.
-      e.preventDefault();
-      let opened = false;
-      try{ const w = window.open(url, "_blank", "noopener"); opened = !!w; if(opened && w.opener) w.opener = null; }catch(err){}
-      copyText(url);
-      toast(opened
-        ? "↗ Opening " + label + " in a new tab…"
-        : "⚠️ This preview can't open Torn links. Copied the " + label + " URL: " + url + " — open the app in your own browser (or the deployed site) to launch it directly.");
-      return;
-    }
-
-    // Real browser / installed app: keep the app open, open Torn alongside.
-    e.preventDefault();
-    try{
-      const w = window.open(url, "_blank", "noopener");
-      if(w && w.opener) w.opener = null;
-    }catch(err){}
-    showReturnFab();
-    toast("↗ Opened " + label + " in a new tab. When you're done, tap \u201C🔁 Return to app\u201D (or switch back to this tab).");
+    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    const hint = isStandalone()
+      ? (isIOS ? "Tap \u201C← LumberCorp\u201D in the top-left status bar to come back." : "Use the back button / app switcher to come back.")
+      : "Switch back to this tab when you're done.";
+    toast("↗ Opened " + label + " in a new tab — the app stays open here. " + hint);
+    logActivity("↗", label + " opened", "Torn opened in a new tab; the app is still running here.");
   });
 
   // settings handlers
@@ -1936,19 +1885,14 @@ function init(){
     switchTab(b.dataset.goto);
   });
 
-  // "Return to app" fab — bring the app back into focus
-  $("returnFab").addEventListener("click", () => {
-    try{ window.focus(); }catch(e){}
-    hideReturnFab();
-    window.scrollTo({ top: 0, behavior: "smooth" });
-    toast("👋 Welcome back to LumberCorp Companion.");
-  });
-
-  // When the user switches back to the app tab, the return is complete.
+  // When the user switches back to the app, gently confirm they're home.
+  let wasHidden = document.hidden;
   document.addEventListener("visibilitychange", () => {
-    if(!document.hidden) hideReturnFab();
+    if(wasHidden && !document.hidden){
+      toast("👋 Welcome back to LumberCorp Companion.");
+    }
+    wasHidden = document.hidden;
   });
-  window.addEventListener("focus", () => { if(!document.hidden) hideReturnFab(); });
 
   // lazy-load live items when user starts searching in live mode
   $("searchInput").addEventListener("focus", async () => {
