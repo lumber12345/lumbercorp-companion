@@ -277,6 +277,7 @@
   }
   .dest .itemchip .n{font-weight:600}
   .dest .itemchip .p{color:var(--muted);font-variant-numeric:tabular-nums}
+  .dest .itemchip .mkt{color:var(--ok);font-variant-numeric:tabular-nums;font-weight:700}
   .dest .itemchip .est{color:var(--faint);font-size:10.5px}
   .dest .itemchip.flower{border-color:rgba(48,164,108,.4)}
   .dest .itemchip.plushie{border-color:rgba(240,180,41,.4)}
@@ -1247,6 +1248,36 @@ function yataFor(country){
   return yataData.stocks[YATA_CODES[country]] || null;
 }
 
+/* Look up an item's current market value from the Torn item database
+   (state.itemCache in live mode, demo items otherwise). */
+function itemMarketValue(name){
+  const pool = state.itemCache || state.items || [];
+  const norm = s => (s || "").toLowerCase().trim();
+  const n = norm(name);
+  if(!n) return null;
+  const val = it => (it && Number(it.market_value) > 0) ? Number(it.market_value) : null;
+  for(const it of pool){ if(norm(it.name) === n) return val(it); }
+  if(n.length >= 4){
+    for(const it of pool){
+      const iname = norm(it.name);
+      if(iname && (iname.includes(n) || n.includes(iname))) return val(it);
+    }
+  }
+  return null;
+}
+
+/* Build one item chip showing the shop buy price plus the market value. */
+function itemChip(name, qty, buyPrice, kind){
+  const mv = itemMarketValue(name);
+  return `
+    <span class="itemchip ${kind || ""}">
+      <span class="n">${name}</span>
+      ${qty != null ? `<span class="q">\u00D7${qty.toLocaleString()}</span>` : ""}
+      <span class="p">buy $${buyPrice.toLocaleString()}</span>
+      ${mv != null ? `<span class="mkt">mkt ${fmtMoney(mv)}</span>` : ""}
+    </span>`;
+}
+
 function destItemsHtml(d){
   const st = yataFor(d.country);
   if(st && Array.isArray(st.stocks)){
@@ -1254,12 +1285,7 @@ function destItemsHtml(d){
       ((b.quantity>0?1:0) - (a.quantity>0?1:0)) || (b.quantity - a.quantity));
     const inStock = items.filter(i => i.quantity > 0);
     const outStock = items.filter(i => i.quantity <= 0);
-    const chips = inStock.map(it => `
-      <span class="itemchip instock">
-        <span class="n">${it.name}</span>
-        <span class="q">\u00D7${it.quantity.toLocaleString()}</span>
-        <span class="p">$${it.cost.toLocaleString()}</span>
-      </span>`).join("");
+    const chips = inStock.map(it => itemChip(it.name, it.quantity, it.cost, "instock")).join("");
     const outNames = outStock.map(i => i.name);
     const out = outNames.length ? `<div class="outlist"><b>Out of stock:</b> ${outNames.slice(0, 18).join(", ")}${outNames.length > 18 ? " +" + (outNames.length-18) + " more" : ""}</div>` : "";
     const age = st.update ? timeAgo(st.update * 1000) : "";
@@ -1267,14 +1293,9 @@ function destItemsHtml(d){
       <div class="stockhead"><span class="live"><span class="dot"></span>LIVE</span><span>${inStock.length} item${inStock.length===1?"":"s"} in stock \u00B7 updated ${age || "recently"}</span></div>
       <div class="items">${chips || '<span style="color:var(--bad);font-size:12px">All sold out \u2014 wait for the next quarter-hour restock.</span>'}</div>${out}`;
   }
-  // fallback: curated static list
-  const chips = d.items.map(it => `
-    <span class="itemchip ${it.kind}">
-      <span class="n">${it.n}</span>
-      <span class="p">$${it.price.toLocaleString()}</span>
-      <span class="est">buy</span>
-    </span>`).join("");
-  return `<div class="stockhead"><span class="live" style="color:var(--muted)"><span class="dot" style="background:var(--muted)"></span>offline</span><span>showing known items (connect for live stock)</span></div>
+  // fallback: curated static list (offline / no live feed)
+  const chips = d.items.map(it => itemChip(it.n, null, it.price, it.kind)).join("");
+  return `<div class="stockhead"><span class="live" style="color:var(--muted)"><span class="dot" style="background:var(--muted)"></span>offline</span><span>showing known items (connect a key for live stock + market prices)</span></div>
     <div class="items">${chips}</div>`;
 }
 
@@ -1721,6 +1742,7 @@ async function loadItemsLive(){
   }));
   state.itemCache = items;
   state.items = items.slice(0, 200);
+  renderDestlist(); // refresh destinations so market prices appear
   return items;
 }
 
