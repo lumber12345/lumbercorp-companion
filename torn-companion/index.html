@@ -42,6 +42,8 @@
       radial-gradient(1200px 600px at 85% -10%, rgba(79,140,255,.10), transparent 60%),
       radial-gradient(900px 500px at -10% 20%, rgba(240,180,41,.06), transparent 60%);
   }
+  #matrix{position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.5;background:#0b0e14}
+  [data-theme="light"] #matrix{display:none}
   .wrap{max-width:1080px;margin:0 auto;padding:0 14px 90px}
 
   /* ---------- header ---------- */
@@ -392,6 +394,7 @@
 </style>
 </head>
 <body data-theme="dark">
+<canvas id="matrix" aria-hidden="true"></canvas>
 <header>
   <div class="hbar">
     <div class="logo">
@@ -551,6 +554,10 @@
       <div class="tt"><b>Dark mode</b><span>Follow dark / light theme</span></div>
       <label class="switch"><input type="checkbox" id="darkToggle"><span class="sl"></span></label>
     </div>
+    <div class="toggle">
+      <div class="tt"><b>Matrix rain</b><span>Green falling-code background (dark mode only)</span></div>
+      <label class="switch"><input type="checkbox" id="matrixRainToggle"><span class="sl"></span></label>
+    </div>
 
     <h2 class="sec" style="margin-top:16px">Notifications (browser)</h2>
     <div class="toggle">
@@ -623,7 +630,7 @@ function fmtDur(sec){
 
 /* ---------- settings ---------- */
 const DEFAULT_SETTINGS = {
-  key: "", refreshInterval: 60, dark: true,
+  key: "", refreshInterval: 60, dark: true, matrixRain: true,
   notifyEnergy: true, notifyNerve: false, notifyTravel: true, notifyHealth: true,
   customActions: []
 };
@@ -1629,6 +1636,7 @@ function syncSettingsUI(){
   $("apiKeyInput").value = settings.key || "";
   $("refreshIntervalInput").value = settings.refreshInterval;
   $("darkToggle").checked = !!settings.dark;
+  $("matrixRainToggle").checked = settings.matrixRain !== false;
   $("notifEnergy").checked = !!settings.notifyEnergy;
   $("notifNerve").checked = !!settings.notifyNerve;
   $("notifTravel").checked = !!settings.notifyTravel;
@@ -1642,6 +1650,7 @@ function applyTheme(){
   document.body.setAttribute("data-theme", settings.dark ? "dark" : "light");
   const m = document.querySelector('meta[name=theme-color]');
   if(m) m.setAttribute("content", settings.dark ? "#0b0e14" : "#eef1f5");
+  if(window._matrixSync) window._matrixSync();
 }
 
 function showMsg(id, text, kind){
@@ -1661,6 +1670,72 @@ function toast(msg){
   t.classList.add("show");
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove("show"), 4000);
+}
+
+/* ---- matrix rain background ---- */
+function initMatrix(){
+  const canvas = $("matrix");
+  if(!canvas) return;
+  const ctx = canvas.getContext("2d");
+  if(!ctx) return;
+
+  const chars = "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロ0123456789ABCDEF<>*+=";
+  const FONT = 15;
+  const SPEED = 0.6; // rain speed multiplier (1 = full)
+  let cols = 0, drops = [], raf = null, running = false, acc = 0;
+
+  function resize(){
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    cols = Math.ceil(canvas.width / FONT);
+    drops = new Array(cols).fill(0).map(() => Math.random() * -60);
+  }
+
+  function draw(){
+    if(!running){ raf = null; return; }
+    acc += SPEED;
+    const step = Math.floor(acc);
+    if(step > 0){
+      acc -= step;
+      ctx.fillStyle = "rgba(11, 14, 20, 0.12)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.font = FONT + "px monospace";
+      for(let i = 0; i < cols; i++){
+        const ch = chars[Math.floor(Math.random() * chars.length)];
+        const y = drops[i] * FONT;
+        ctx.fillStyle = Math.random() < 0.08 ? "#d8ffe8" : "#3be07a";
+        ctx.fillText(ch, i * FONT, y);
+        if(y > canvas.height && Math.random() > 0.975) drops[i] = 0;
+        drops[i] += step;
+      }
+    }
+    raf = requestAnimationFrame(draw);
+  }
+
+  function start(){
+    if(running) return;
+    running = true;
+    if(!raf) raf = requestAnimationFrame(draw);
+  }
+  function stop(){
+    running = false;
+    if(raf){ cancelAnimationFrame(raf); raf = null; }
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+  function sync(){
+    if(settings.matrixRain !== false && settings.dark !== false){
+      canvas.style.display = "block";
+      start();
+    } else {
+      canvas.style.display = "none";
+      stop();
+    }
+  }
+
+  resize();
+  window.addEventListener("resize", resize);
+  window._matrixSync = sync;
+  sync();
 }
 
 /* ---- PWA install ---- */
@@ -1758,6 +1833,7 @@ function switchTab(name){
 function init(){
   applyTheme();
   initPWA();
+  initMatrix();
 
   $("refreshBtn").addEventListener("click", refresh);
   $("settingsBtn").addEventListener("click", openSettings);
@@ -1825,6 +1901,7 @@ function init(){
     settings.refreshInterval = v; saveSettings(); restartAutoRefresh();
   });
   $("darkToggle").addEventListener("change", () => { settings.dark = $("darkToggle").checked; saveSettings(); });
+  $("matrixRainToggle").addEventListener("change", () => { settings.matrixRain = $("matrixRainToggle").checked; saveSettings(); });
   $("notifEnergy").addEventListener("change", () => { settings.notifyEnergy = $("notifEnergy").checked; saveSettings(); });
   $("notifNerve").addEventListener("change", () => { settings.notifyNerve = $("notifNerve").checked; saveSettings(); });
   $("notifTravel").addEventListener("change", () => { settings.notifyTravel = $("notifTravel").checked; saveSettings(); });
