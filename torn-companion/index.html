@@ -377,6 +377,22 @@
   .btn.ghost:hover{background:var(--card2)}
   .rowbtns{display:flex;gap:10px}
 
+  /* ---------- stock report modal ---------- */
+  .rrow{display:flex;gap:8px;align-items:center;margin-top:8px}
+  .rrow input{
+    background:var(--card);border:1px solid var(--border);border-radius:9px;
+    padding:9px 11px;color:var(--text);font-size:13.5px;outline:none;min-width:0;
+  }
+  .rrow input:focus{border-color:var(--accent)}
+  .rrow .rname{flex:1.6}
+  .rrow .rqty{flex:0 0 64px;width:64px}
+  .rrow .rcost{flex:0 0 84px;width:84px}
+  .rrow .rdel{flex:0 0 auto;width:34px;height:34px;border-radius:9px}
+  #reportCountry{
+    width:100%;background:var(--card);border:1px solid var(--border);border-radius:11px;
+    padding:11px 13px;color:var(--text);font-size:14px;outline:none;
+  }
+
   .msg{font-size:12.5px;margin-top:10px;padding:9px 12px;border-radius:9px;border:1px solid var(--border);background:var(--card);display:none}
   .msg.show{display:block}
   .msg.err{border-color:rgba(231,76,60,.4);color:#ff9a8b}
@@ -489,6 +505,7 @@
     <div class="restockbar" style="margin-top:0">
       <span class="ic">📡</span>
       <div id="yataMeta">Loading foreign stock…</div>
+      <button class="btn ghost" id="reportStockBtn" style="width:auto;margin:0;flex:0 0 auto;padding:8px 12px;font-size:12.5px">📣 Report stock</button>
     </div>
     <div class="destlist" id="destlist"></div>
   </section>
@@ -592,6 +609,25 @@
   </div>
 </div>
 
+<!-- Stock report modal -->
+<div class="overlay" id="reportOverlay">
+  <div class="sheet">
+    <h3>📣 Report foreign stock <button class="x" id="closeReport">✕</button></h3>
+    <div class="field" style="margin-top:14px">
+      <label>Country you're in right now</label>
+      <select id="reportCountry"></select>
+    </div>
+    <div class="field">
+      <label>Stock on the shelves</label>
+      <div class="hint" style="margin-bottom:2px">Enter the quantity you saw for each item. Prefilled items are this country's known stock — add more with "＋ Add item".</div>
+      <div id="reportItems"></div>
+      <button class="btn ghost" id="reportAddItem" style="margin-top:10px">＋ Add item</button>
+    </div>
+    <button class="btn" id="reportSubmit">Submit report</button>
+    <div class="msg" id="reportMsg"></div>
+  </div>
+</div>
+
 <script>
 /* ============================================================================
    LumberCorp Companion — a better PDA (web client)
@@ -623,9 +659,14 @@ function fmtDur(sec){
   sec = Math.max(0, Math.floor(sec));
   const d = Math.floor(sec/86400), h = Math.floor(sec%86400/3600), m = Math.floor(sec%3600/60), s = sec%60;
   if(d > 0) return d + "d " + h + "h";
-  if(h > 0) return h + "h " + m + "m";
-  if(m > 0) return m + "m " + s + "s";
+  if(h > 0) return h + "h" + (m > 0 ? " " + m + "m" : "");
+  if(m > 0) return m + "m" + (s > 0 ? " " + s + "s" : "");
   return s + "s";
+}
+/* Ticket prices are small, round numbers — always show full dollars (no K/M). */
+function fmtTicket(n){
+  if(n == null) return "—";
+  return "$" + Number(n).toLocaleString("en-US");
 }
 
 /* ---------- settings ---------- */
@@ -1227,14 +1268,21 @@ const YATA_CODES = {
   "China":"chi", "United Arab Emirates":"uae", "South Africa":"sou"
 };
 const YATA_URL = "https://yata.yt/api/v1/travel/export/";
+/* Optional backend aggregator (see /server/). When YATA is down, the client
+   falls back to this — it serves last-good (cached) stock plus any crowd
+   reports. Set to your Render Web Service URL, e.g.
+   "https://lumbercorp-aggregator.onrender.com". Leave "" to disable. */
+const AGGREGATOR_URL = "";
 
-let yataData = null;      // raw feed
-let yataUpdatedAt = 0;    // when we last fetched
+let yataData = store.get("tc_yata_cache", null);   // last-known-good feed
+let yataUpdatedAt = store.get("tc_yata_updated", 0); // when the live feed last succeeded
 let yataLoading = false;
+let yataStale = false;   // true when the live feed is unreachable and we're showing cached data
 
 async function fetchYata(force){
   if(yataLoading) return;
   yataLoading = true;
+  // 1) YATA directly (freshest)
   try{
     const r = await fetch(YATA_URL, { cache: "no-store" });
     if(!r.ok) throw new Error("HTTP " + r.status);
@@ -1242,9 +1290,29 @@ async function fetchYata(force){
     if(j && j.stocks){
       yataData = j;
       yataUpdatedAt = Date.now();
+      yataStale = false;
+      store.set("tc_yata_cache", j);
+      store.set("tc_yata_updated", yataUpdatedAt);
     }
   }catch(e){
-    yataData = null;
+    // 2) Aggregator backend (serves cached/stale + crowd reports)
+    let gotAgg = false;
+    if(AGGREGATOR_URL){
+      try{
+        const r2 = await fetch(AGGREGATOR_URL + "/api/abroad-stock", { cache: "no-store" });
+        if(r2.ok){
+          const a = await r2.json();
+          if(a && a.stocks){
+            yataData = a;
+            yataUpdatedAt = a.updatedAt || Date.now();
+            yataStale = !!a.stale;
+            gotAgg = true;
+          }
+        }
+      }catch(e2){}
+    }
+    // 3) keep last-good local cache (already loaded via store at init)
+    if(!gotAgg) yataStale = true;
   }
   yataLoading = false;
   renderDestlist();
@@ -1253,6 +1321,92 @@ async function fetchYata(force){
 function yataFor(country){
   if(!yataData || !yataData.stocks) return null;
   return yataData.stocks[YATA_CODES[country]] || null;
+}
+
+/* ================= crowd-sourced stock reporting (Tier 3) ================= */
+let reportRows = []; // { name, quantity, cost }
+
+function escHtml(s){
+  return String(s == null ? "" : s).replace(/[&<>"']/g, c =>
+    ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+function openReport(){
+  if(!AGGREGATOR_URL){
+    toast("⚠️ Stock reporting needs the aggregator backend. It's enabled on your deployed setup (set AGGREGATOR_URL).");
+    return;
+  }
+  const sel = $("reportCountry");
+  sel.innerHTML = DESTINATIONS.map(d => `<option value="${d.country}">${flagEmoji(d.flag)} ${d.country}</option>`).join("");
+  // prefill with the country you're currently abroad in, if known
+  const cur = state.user.travel && state.user.travel.destination
+    ? DESTINATIONS.find(x => x.country.toLowerCase() === String(state.user.travel.destination).toLowerCase())
+    : null;
+  sel.value = cur ? cur.country : DESTINATIONS[0].country;
+  resetReportRows();
+  $("reportMsg").className = "msg";
+  $("reportOverlay").classList.add("open");
+}
+function closeReport(){ $("reportOverlay").classList.remove("open"); }
+
+function resetReportRows(){
+  const d = DESTINATIONS.find(x => x.country === $("reportCountry").value);
+  reportRows = (d && d.items ? d.items : []).map(it => ({ name: it.n, quantity: "", cost: it.price }));
+  renderReportRows();
+}
+
+function renderReportRows(){
+  const box = $("reportItems");
+  box.innerHTML = reportRows.map((r, i) => `
+    <div class="rrow" data-i="${i}">
+      <input type="text" class="rname" value="${escHtml(r.name)}" placeholder="Item name">
+      <input type="number" class="rqty" min="0" value="${escHtml(r.quantity)}" placeholder="Qty">
+      <input type="number" class="rcost" min="0" value="${escHtml(r.cost)}" placeholder="Shop $">
+      <button class="iconbtn rdel" title="Remove">✕</button>
+    </div>`).join("");
+  box.querySelectorAll(".rrow").forEach(row => {
+    const i = Number(row.dataset.i);
+    row.querySelector(".rname").addEventListener("input", e => reportRows[i].name = e.target.value);
+    row.querySelector(".rqty").addEventListener("input", e => reportRows[i].quantity = e.target.value);
+    row.querySelector(".rcost").addEventListener("input", e => reportRows[i].cost = e.target.value);
+    row.querySelector(".rdel").addEventListener("click", () => { reportRows.splice(i, 1); renderReportRows(); });
+  });
+}
+
+async function submitReport(){
+  if(!AGGREGATOR_URL){ toast("⚠️ No aggregator backend configured."); return; }
+  const country = $("reportCountry").value;
+  const code = YATA_CODES[country];
+  if(!code){ toast("⚠️ Unknown country code for " + country + "."); return; }
+  const stock = {};
+  let any = false;
+  for(const r of reportRows){
+    const name = (r.name || "").trim();
+    const qty = parseInt(r.quantity, 10);
+    if(!name || isNaN(qty) || qty < 0) continue;
+    any = true;
+    const cost = parseInt(r.cost, 10);
+    stock[name] = { quantity: qty, cost: isNaN(cost) ? 0 : cost };
+  }
+  if(!any){ showMsg("reportMsg", "Enter a quantity for at least one item.", "err"); return; }
+  try{
+    const res = await fetch(AGGREGATOR_URL + "/report", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ country: code, stock })
+    });
+    if(!res.ok) throw new Error("HTTP " + res.status);
+    const j = await res.json();
+    if(j && j.ok){
+      showMsg("reportMsg", "✅ Thanks! Your stock report was submitted.", "ok");
+      setTimeout(closeReport, 900);
+      toast("✅ Stock report sent — thanks for helping the community.");
+    } else {
+      showMsg("reportMsg", "⚠️ " + ((j && j.message) || "Report failed."), "err");
+    }
+  }catch(e){
+    showMsg("reportMsg", "⚠️ Couldn't reach the aggregator (" + e.message + ").", "err");
+  }
 }
 
 /* Look up an item's current market value from the Torn item database
@@ -1296,8 +1450,11 @@ function destItemsHtml(d){
     const outNames = outStock.map(i => i.name);
     const out = outNames.length ? `<div class="outlist"><b>Out of stock:</b> ${outNames.slice(0, 18).join(", ")}${outNames.length > 18 ? " +" + (outNames.length-18) + " more" : ""}</div>` : "";
     const age = st.update ? timeAgo(st.update * 1000) : "";
+    const liveLabel = yataStale
+      ? `<span class="live" style="color:var(--warn)"><span class="dot" style="background:var(--warn)"></span>cached</span>`
+      : `<span class="live"><span class="dot"></span>LIVE</span>`;
     return `
-      <div class="stockhead"><span class="live"><span class="dot"></span>LIVE</span><span>${inStock.length} item${inStock.length===1?"":"s"} in stock \u00B7 updated ${age || "recently"}</span></div>
+      <div class="stockhead">${liveLabel}<span>${inStock.length} item${inStock.length===1?"":"s"} in stock \u00B7 ${yataStale ? "last known " : "updated "}${age || "recently"}</span></div>
       <div class="items">${chips || '<span style="color:var(--bad);font-size:12px">All sold out \u2014 wait for the next quarter-hour restock.</span>'}</div>${out}`;
   }
   // fallback: curated static list (offline / no live feed)
@@ -1327,7 +1484,7 @@ function renderDestlist(){
         <div class="dmeta">
           <span class="chip">\u2708\uFE0F ${fmtDur(d.times.standard*60)}</span>
           <span class="chip">\u2708\uFE0F ${fmtDur(d.times.airstrip*60)} airstrip</span>
-          <span class="chip">\u{1F4B5} ${fmtMoney(d.cost)}</span>
+          <span class="chip">\u{1F4B5} ${fmtTicket(d.cost)}</span>
         </div>
       </div>
       ${destItemsHtml(d)}
@@ -1338,13 +1495,16 @@ function renderDestlist(){
 function renderYataMeta(){
   const el = $("yataMeta");
   if(!el) return;
-  if(yataData){
+  if(yataData && yataStale){
+    const age = timeAgo(yataUpdatedAt || Date.now());
+    el.innerHTML = `<span class="live" style="color:var(--warn)"><span class="dot" style="background:var(--warn)"></span>cached</span> YATA is unreachable \u2014 showing last-known stock from ${age}. Retrying every 60s. Live fallback: <a href="https://weav3r.dev/travel-stock" target="_blank" rel="noopener">TornW3B</a>.`;
+  } else if(yataData){
     const age = yataData.timestamp ? timeAgo(yataData.timestamp * 1000) : "recently";
     el.innerHTML = `<span class="live"><span class="dot"></span>LIVE</span> Foreign stock \u00B7 data updated ${age} \u00B7 auto-refreshes every 60s`;
   } else if(yataLoading){
     el.textContent = "Fetching live stock from YATA\u2026";
   } else {
-    el.innerHTML = `Live stock unavailable (offline / blocked in preview) \u2014 showing known items. Open <a href="https://yata.yt/bazaar/abroad/" target="_blank" rel="noopener">YATA abroad</a> for live data.`;
+    el.innerHTML = `Live stock unavailable (offline / blocked in preview) \u2014 showing known items + market prices. Check live stock on <a href="https://yata.yt/bazaar/abroad/" target="_blank" rel="noopener">YATA abroad</a> or <a href="https://weav3r.dev/travel-stock" target="_blank" rel="noopener">TornW3B (weav3r)</a>.`;
   }
 }
 
@@ -1363,7 +1523,7 @@ const FT_TYPES = {
    Airstrip + WLT are free; Business costs a Business Class Ticket. */
 function ftCostLabel(d, type){
   if(!d) return "";
-  if(type === "standard") return fmtMoney(d.cost);
+  if(type === "standard") return fmtTicket(d.cost);
   if(type === "airstrip") return "Free";
   if(type === "wlt") return "Free";
   if(type === "business") return "1\u00D7 ticket";
@@ -1371,7 +1531,7 @@ function ftCostLabel(d, type){
 }
 function ftCostNote(d, type){
   if(!d) return "";
-  if(type === "standard") return fmtMoney(d.cost);
+  if(type === "standard") return fmtTicket(d.cost);
   if(type === "airstrip") return "Free (with pilot)";
   if(type === "wlt") return "Free (WLT)";
   if(type === "business") return "1\u00D7 Business Class Ticket";
@@ -1841,13 +2001,19 @@ function init(){
   $("openSettingsLink").addEventListener("click", e => { e.preventDefault(); openSettings(); });
   $("demoBannerClose").addEventListener("click", () => $("demoBanner").style.display = "none");
   $("overlay").addEventListener("click", e => { if(e.target === $("overlay")) closeSettings(); });
+  $("reportOverlay").addEventListener("click", e => { if(e.target === $("reportOverlay")) closeReport(); });
+  $("reportStockBtn").addEventListener("click", openReport);
+  $("closeReport").addEventListener("click", closeReport);
+  $("reportCountry").addEventListener("change", resetReportRows);
+  $("reportAddItem").addEventListener("click", () => { reportRows.push({ name:"", quantity:"", cost:"" }); renderReportRows(); });
+  $("reportSubmit").addEventListener("click", submitReport);
 
   $("searchInput").addEventListener("input", () => { renderItems(); });
   document.addEventListener("keydown", e => {
     if(e.key === "/" && document.activeElement !== $("searchInput") && document.activeElement !== $("apiKeyInput")){
       e.preventDefault(); $("searchInput").focus();
     }
-    if(e.key === "Escape") closeSettings();
+    if(e.key === "Escape"){ closeSettings(); closeReport(); }
   });
 
   // External links (quick actions). The anchor's native target="_blank"
