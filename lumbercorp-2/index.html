@@ -103,6 +103,20 @@
   .clockbox{padding:4px 11px;font-size:11.5px;color:var(--faint);line-height:1.6}
   .clockbox b{color:var(--muted);font-variant-numeric:tabular-nums;font-weight:600}
 
+  /* ---- bazaar sub tabs ---- */
+  .bz-subtabs{display:flex;gap:6px;margin:0 2px 12px;overflow-x:auto;scrollbar-width:none}
+  .bz-subtabs::-webkit-scrollbar{display:none}
+  .bz-subtabs button{
+    display:inline-flex;align-items:center;gap:6px;flex:0 0 auto;
+    background:var(--card);border:1px solid var(--border);color:var(--muted);
+    font-size:12.5px;font-weight:700;padding:8px 14px;border-radius:99px;cursor:pointer;transition:.15s;
+    white-space:nowrap;
+  }
+  .bz-subtabs button:hover{color:var(--text);border-color:var(--border2)}
+  .bz-subtabs button.active{background:var(--card3);color:var(--text);border-color:var(--accent);box-shadow:0 2px 12px var(--glow)}
+  .bz-subtabs .live-dot{width:7px;height:7px;border-radius:50%;background:var(--ok);animation:pulse 2s infinite}
+  #bzFrame{width:100%;height:clamp(560px,80vh,1100px);border:1px solid var(--border2);border-radius:14px;background:#0b0e14;display:block;margin-top:12px}
+
   /* ================= bazaar finder ================= */
   .bz-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 2px 12px}
   .bz-bar input{flex:1;min-width:220px;background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-weight:600}
@@ -570,6 +584,26 @@
 
     <!-- ============ BAZAAR FINDER ============ -->
     <section id="page-bazaar" hidden>
+      <nav class="bz-subtabs" id="bzSubTabs">
+        <button class="active" data-bzview="scan"><span class="live-dot"></span> Scanner</button>
+        <button data-bzview="find">⚡ Quick Find</button>
+      </nav>
+      <div class="card setcard" id="bzScanNote" hidden>
+        <div class="setrow">
+          <div><div class="st">🔬 Bazaar Scanner runs on live Torn data</div>
+          <div class="sd">Switch to <b>Live mode</b> in Setup — the scanner then tracks every bazaar: ROI, spreads, 1 h trends and the cheapest open asks, straight from the official API.</div></div>
+        </div>
+      </div>
+      <div class="card setcard" id="bzScanProxy" hidden>
+        <div class="setrow">
+          <div><div class="st">📡 Scanner needs its backend</div>
+          <div class="sd">The scanner talks through your proxy (on Render it's wired automatically). Running locally? Paste the proxy URL in <b>Rank Wars → ⚡ Custom backend</b> — both tabs share it.</div></div>
+        </div>
+      </div>
+      <div id="bzview-scan" hidden>
+        <iframe id="bzFrame" title="Torn Bazaar Scanner" src="about:blank" referrerpolicy="no-referrer"></iframe>
+      </div>
+      <div id="bzview-find" hidden>
       <div class="card setcard" id="bzNeedKey" hidden>
         <div class="setrow">
           <div><div class="st">🛒 Bazaar Finder needs your Torn key</div>
@@ -584,6 +618,7 @@
       <div class="bz-head" id="bzHead" hidden></div>
       <div id="bzStatus"></div>
       <div id="bzResult"></div>
+      </div><!-- /bzview-find -->
     </section>
 
     <!-- ============ STATS ============ -->
@@ -809,7 +844,7 @@ function flagEmoji(cc){
 }
 
 /* ---------- settings ---------- */
-const APP_VERSION = "2.8.0";
+const APP_VERSION = "2.9.0";
 const DEFAULT_SETTINGS = {
   mode: "demo", apiKey: "", refresh: 60,
   theme: "dark", accent: "amber",
@@ -2049,10 +2084,40 @@ function bzRender(){
   if(rows.length > MAX) html += '<div class="sd" style="margin:8px 2px">+ ' + (rows.length - MAX) + " more listings not shown — cheapest always first.</div>";
   out.innerHTML = html;
 }
+const bzViewState = { view: "scan", frameReady: false };
+function bzApiBase(){
+  return (settings.rwProxy || (window.RW_PROXY_URL || "")).trim().replace(/\/$/, "");
+}
+function bzSyncEmbed(){
+  try{
+    localStorage.setItem("bz_api_base", bzApiBase());
+    if((settings.apiKey || "").trim()) localStorage.setItem("torn_bazaar_api_key", settings.apiKey.trim());
+  }catch(e){ /* storage unavailable — embed asks for its own key */ }
+}
+function bzScanOn(){
+  const live = state.mode === "live", base = !!bzApiBase();
+  $("bzScanNote").hidden = live;
+  $("bzScanProxy").hidden = !(live && !base);
+  $("bzview-scan").hidden = !(live && base);
+  if(live && base){
+    bzSyncEmbed();
+    if(!bzViewState.frameReady){ $("bzFrame").src = "bazaar/index.html"; bzViewState.frameReady = true; }
+  }
+}
+function bzSetView(v){
+  if(!["scan", "find"].includes(v)) return;
+  bzViewState.view = v;
+  document.querySelectorAll("#bzSubTabs button").forEach(b =>
+    b.classList.toggle("active", b.dataset.bzview === v));
+  $("bzview-find").hidden = v !== "find";
+  if(v === "scan") bzScanOn();
+}
 function bzEnter(){
   $("bzNeedKey").hidden = !(state.mode === "live" && !bzKey());
   bzEnsureItems();
   if(bzState.item) bzRender();
+  bzScanOn();
+  if(bzViewState.view === "find") $("bzview-find").hidden = false;
 }
 /* ============================== TICKER ============================== */
 /* Advance bars client-side each second (works for demo & between live polls). */
@@ -2368,6 +2433,8 @@ function wire(){
 
 
   // bazaar finder
+  document.querySelectorAll("#bzSubTabs button").forEach(b =>
+    b.addEventListener("click", () => bzSetView(b.dataset.bzview)));
   $("bzSearch").addEventListener("input", bzSuggest);
   $("bzSearch").addEventListener("keydown", (e) => { if(e.key === "Enter"){ e.preventDefault(); bzPickFirst(); } });
   $("bzGo").addEventListener("click", bzPickFirst);

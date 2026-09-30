@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Torn Bazaar Scanner</title>
+<style>
+  :root {
+    --bg: #0b0e14;
+    --panel: #121722;
+    --panel2: #171e2c;
+    --border: #232c3f;
+    --text: #dbe2ee;
+    --muted: #7d8aa0;
+    --accent: #4f8cff;
+    --gold: #f0b429;
+    --green: #37d67a;
+    --red: #ff5d5d;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  .hidden { display: none !important; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 18px; border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, #10141d, #0d1119);
+    position: sticky; top: 0; z-index: 10; flex-wrap: wrap; gap: 8px;
+  }
+  .brand { font-size: 17px; font-weight: 700; letter-spacing: .3px; }
+  .brand b { color: var(--gold); }
+  .brand small { color: var(--muted); font-weight: 400; margin-left: 10px; }
+  .header-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+  .chip {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 20px; padding: 4px 12px; font-size: 12px; color: var(--muted);
+  }
+  .chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .chip.ok .dot { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .chip.bad .dot { background: var(--red); box-shadow: 0 0 6px var(--red); }
+  .chip.warn .dot { background: var(--gold); }
+  .chip button {
+    background: none; border: none; color: var(--accent); cursor: pointer;
+    font-size: 12px; padding: 0;
+  }
+
+  .wrap { padding: 16px 18px 40px; max-width: 1500px; margin: 0 auto; }
+
+  /* ---- key gate ---- */
+  .gate {
+    max-width: 560px; margin: 7vh auto 0; background: var(--panel);
+    border: 1px solid var(--border); border-radius: 12px; padding: 28px;
+  }
+  .gate h1 { margin: 0 0 6px; font-size: 21px; }
+  .gate h1 span { color: var(--gold); }
+  .gate p { color: var(--muted); font-size: 13px; margin: 10px 0; }
+  .gate .steps { background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; font-size: 13px; color: var(--text); }
+  .gate .steps ol { margin: 8px 0 0; padding-left: 20px; }
+  .gate .steps li { margin: 4px 0; color: var(--muted); }
+  .gate .steps li b { color: var(--text); }
+  .gate input[type=password], .gate input[type=text] {
+    width: 100%; background: #0d1119; color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 11px 12px; font-size: 14px; font-family: var(--mono); margin-top: 14px;
+  }
+  .gate input:focus { outline: none; border-color: var(--accent); }
+  .gate .btn-row { display: flex; gap: 10px; margin-top: 14px; }
+  .gate .err { color: var(--red); font-size: 13px; margin-top: 10px; min-height: 16px; }
+  .gate .note { font-size: 11px; color: #5c6778; margin-top: 12px; }
+  .btn {
+    background: var(--accent); color: #fff; border: none; border-radius: 8px;
+    padding: 11px 18px; font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  .btn:hover { filter: brightness(1.1); }
+  .btn.ghost { background: var(--panel2); color: var(--muted); border: 1px solid var(--border); }
+
+  /* ---- stats ---- */
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .stat {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px 14px;
+  }
+  .stat .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); }
+  .stat .val { font-size: 20px; font-weight: 700; font-family: var(--mono); margin-top: 2px; }
+  .stat .sub { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+  .stat .val.green { color: var(--green); }
+  .stat .val.gold { color: var(--gold); }
+
+  /* ---- scan progress ---- */
+  .scanbar { margin: 0 0 12px; font-size: 12px; color: var(--muted); font-family: var(--mono); display: flex; align-items: center; gap: 10px; }
+  .scanbar .bar { flex: 1; height: 6px; background: var(--panel2); border-radius: 3px; overflow: hidden; border: 1px solid var(--border); }
+  .scanbar .fill { height: 100%; background: linear-gradient(90deg, #2b5fb8, var(--accent)); width: 0%; transition: width .6s; }
+
+  /* ---- controls ---- */
+  .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+  .controls input[type=text] {
+    background: var(--panel); border: 1px solid var(--border); color: var(--text);
+    border-radius: 8px; padding: 8px 12px; font-size: 13px; min-width: 220px;
+  }
+  .searchbox { position: relative; }
+  .searchbox input { min-width: 280px; padding-right: 30px; }
+  .search-clear {
+    position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+    background: none; border: none; color: var(--muted); font-size: 16px;
+    cursor: pointer; padding: 2px 7px; line-height: 1;
+  }
+  .search-clear:hover { color: var(--text); }
+  .suggest {
+    position: absolute; top: calc(100% + 4px); left: 0; width: 360px; max-height: 330px;
+    overflow-y: auto; background: var(--panel2); border: 1px solid var(--border);
+    border-radius: 8px; box-shadow: 0 10px 28px rgba(0,0,0,.55); z-index: 30;
+  }
+  .sug-item { display: flex; align-items: center; gap: 8px; padding: 7px 10px; cursor: pointer; font-size: 13px; white-space: nowrap; }
+  .sug-item.active { background: #1d2740; }
+  .sug-item .nm { font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+  .sug-item mark { background: none; color: var(--gold); }
+  .sug-item .sp { flex: 1; }
+  .sug-item .mkt { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .sug-item .badge { margin-left: 0; }
+  .sug-empty { padding: 9px 10px; color: var(--muted); font-size: 12px; }
+  .controls select {
+    background: var(--panel); border: 1px solid var(--border); color: var(--text);
+    border-radius: 8px; padding: 8px 10px; font-size: 13px;
+  }
+  .controls label { font-size: 13px; color: var(--muted); display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+  .controls .spacer { flex: 1; }
+  .controls button {
+    background: var(--panel2); color: var(--muted); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 12px; font-size: 13px; cursor: pointer;
+  }
+  .controls button:hover { color: var(--text); border-color: var(--accent); }
+  .count-note { font-size: 12px; color: var(--muted); font-family: var(--mono); }
+
+  /* ---- table ---- */
+  .tablewrap { border: 1px solid var(--border); border-radius: 10px; overflow: auto; max-height: calc(100vh - 250px); background: var(--panel); }
+  table { border-collapse: collapse; width: 100%; min-width: 1080px; }
+  thead th {
+    position: sticky; top: 0; z-index: 2; background: var(--panel2);
+    font-size: 11px; text-transform: uppercase; letter-spacing: .7px; color: var(--muted);
+    text-align: right; padding: 9px 10px; border-bottom: 1px solid var(--border);
+    cursor: pointer; user-select: none; white-space: nowrap;
+  }
+  thead th:hover { color: var(--text); }
+  thead th.left { text-align: left; }
+  thead th .arrow { color: var(--accent); margin-left: 3px; }
+  tbody td {
+    padding: 7px 10px; border-bottom: 1px solid #1a2233;
+    text-align: right; font-family: var(--mono); font-size: 12.5px;
+    white-space: nowrap; font-variant-numeric: tabular-nums;
+  }
+  tbody td.left { text-align: left; }
+  tbody tr.item-row { cursor: pointer; }
+  tbody tr.item-row:hover { background: #161d2b; }
+  .nm { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 13px; font-weight: 600; }
+  .idn { color: var(--muted); font-size: 11px; font-family: var(--mono); }
+  .badge {
+    display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 8px;
+    border: 1px solid var(--border); color: var(--muted); margin-left: 6px; vertical-align: 1px;
+  }
+  .badge.commodity { color: #6fb1ff; border-color: #274b7a; }
+  .badge.item { color: var(--gold); border-color: #6b5416; }
+  .pos { color: var(--green); }
+  .neg { color: var(--red); }
+  .dim { color: var(--muted); }
+  .mkt-src { font-size: 10px; color: var(--muted); }
+  canvas.spark { width: 120px; height: 30px; display: block; margin-left: auto; }
+  .stale { color: var(--gold); }
+
+  /* ---- detail row ---- */
+  tr.detail-row td { background: #0e1320; padding: 14px 18px; text-align: left; white-space: normal; }
+  .detail-grid { display: grid; grid-template-columns: minmax(340px, 1.5fr) minmax(240px, 1fr) minmax(280px, 1.1fr); gap: 20px; }
+  @media (max-width: 1100px) { .detail-grid { grid-template-columns: 1fr; } }
+  .detail-grid h4 { margin: 0 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); }
+  .asks table { min-width: 0; width: 100%; }
+  .asks td, .asks th { border: none; padding: 3px 8px; font-size: 12px; }
+  .asks th { position: static; background: none; cursor: default; }
+  .lock { color: var(--gold); }
+  .iticon {
+    width: 24px; height: 24px; border-radius: 5px; object-fit: contain;
+    vertical-align: -7px; margin-right: 7px; flex: none;
+    background: #0d1119; border: 1px solid var(--border);
+  }
+  .iticon.av {
+    display: inline-flex; align-items: center; justify-content: center;
+    font: 700 12px -apple-system, BlinkMacSystemFont, sans-serif;
+    color: #fff; border: none;
+  }
+  .fullasks { max-height: 300px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; }
+  .fullasks table { min-width: 0; }
+  .asks-head { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; }
+  .asks-head h4 { margin: 0; }
+  .asks-head .sp { flex: 1; }
+  .mini {
+    background: var(--panel); border: 1px solid var(--border); color: var(--muted);
+    border-radius: 6px; padding: 3px 9px; font-size: 11px; cursor: pointer;
+  }
+  .mini:hover { color: var(--text); border-color: var(--accent); }
+  .spin {
+    width: 11px; height: 11px; border: 2px solid var(--border); border-top-color: var(--accent);
+    border-radius: 50%; display: inline-block; animation: rot .8s linear infinite; vertical-align: -1px;
+  }
+  @keyframes rot { to { transform: rotate(360deg); } }
+  .calc-box { background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
+  .calc-box label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px; }
+  .calc-box input, .calc-box select {
+    background: #0d1119; color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 7px 9px; font-family: var(--mono); font-size: 13px; width: 100%;
+  }
+  .calc-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .calc-out { margin-top: 10px; font-family: var(--mono); font-size: 13px; }
+  .calc-out .big { font-size: 17px; font-weight: 700; color: var(--gold); }
+  .calc-out .line { display: flex; justify-content: space-between; padding: 2px 0; color: var(--muted); }
+  .calc-out .line b { color: var(--text); font-weight: 600; }
+
+  footer { margin-top: 14px; font-size: 11px; color: #55617a; font-family: var(--mono); }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">⚔ Torn <b>Bazaar Scanner</b><small>live prices &amp; profit spreads for every bazaar item</small></div>
+  <div class="header-right">
+    <span class="chip" id="scanChip"><span class="dot"></span><span id="scanChipText">idle</span></span>
+    <span class="chip" id="keyChip"><span id="keyChipText">no key</span><button id="keyBtn" class="hidden" type="button">change key</button></span>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <!-- ===== key gate ===== -->
+  <section class="gate" id="keyGate">
+    <h1>Enter your Torn <span>API key</span></h1>
+    <p>Torn requires a valid API key on every API request, so this scanner needs yours to pull bazaar data.</p>
+    <div class="steps">
+      How to get a key:
+      <ol>
+        <li>On <b>torn.com</b>, click your <b>username (top-right) → Settings</b></li>
+        <li>In the <b>API key</b> section, <b>generate a key</b> with access level <b>Full</b> (at least <b>Limited</b> — bazaar data is blocked for lower levels)</li>
+        <li>Copy the 16-character key and paste it below</li>
+      </ol>
+    </div>
+    <input type="password" id="keyInput" placeholder="e.g. 1a2b3c4d5e6f7890" autocomplete="off" spellcheck="false">
+    <div class="btn-row">
+      <button class="btn" id="keySave" type="button">Connect &amp; scan the bazaar</button>
+    </div>
+    <div class="err" id="keyErr"></div>
+    <p class="note">Your key is stored only in this browser (localStorage) and is sent only to api.torn.com via this server — it is never logged or shared. You can remove it anytime with “change key” → clear.</p>
+  </section>
+
+  <!-- ===== dashboard ===== -->
+  <section id="dash" class="hidden">
+    <div class="stats" id="stats"></div>
+
+    <div class="scanbar">
+      <span id="scanLabel">scanning listings…</span>
+      <div class="bar"><div class="fill" id="scanFill"></div></div>
+      <span id="scanReq">0 req/min</span>
+    </div>
+
+    <div class="controls">
+      <div class="searchbox">
+        <input type="text" id="search" placeholder="Search item name… (type to autocomplete)" autocomplete="off" spellcheck="false">
+        <button type="button" id="searchClear" class="search-clear hidden" title="Clear search">×</button>
+        <div class="suggest hidden" id="suggest"></div>
+      </div>
+      <select id="typeFilter" title="Filter by facet type">
+        <option value="all">All types</option>
+        <option value="commodity">Commodities</option>
+        <option value="item">Items</option>
+      </select>
+      <label title="Only show items where market price is above the lowest open ask (buy low → sell at market profit)"><input type="checkbox" id="profitOnly"> Profitable only</label>
+      <label title="Only items that have open listings (things you can actually buy)">
+        <input type="checkbox" id="hasAsk"> Has open asks
+      </label>
+      <span class="spacer"></span>
+      <label>Sort
+        <select id="sortSel">
+          <option value="roi-desc">ROI (best flips first)</option>
+          <option value="spread-desc">Spread ($ per unit)</option>
+          <option value="market-desc">Market value</option>
+          <option value="ask-asc">Lowest ask</option>
+          <option value="count-desc">1h activity</option>
+          <option value="vol-desc">1h volume ($)</option>
+          <option value="base-asc">Base value</option>
+          <option value="name-asc">Name A→Z</option>
+          <option value="scannedAt-desc">Freshest scan</option>
+        </select>
+      </label>
+      <button id="csvBtn" type="button" title="Download current view as CSV">⬇ CSV</button>
+      <span class="count-note" id="countNote"></span>
+    </div>
+
+    <div class="tablewrap">
+      <table id="grid">
+        <thead>
+          <tr>
+            <th class="left" data-k="name" title="Bazaar facet (commodity or item)">Item</th>
+            <th data-k="base" title="Torn's base price for the item (from bazaar/facets)">Base</th>
+            <th data-k="market" title="Market value: quantity-weighted average sale price, last hour (falls back to last sale, then base)">Market value</th>
+            <th data-k="range" title="Lowest – highest traded price in the last hour">1h range</th>
+            <th data-k="count" title="Trades in the last hour (with $ volume)">1h trades</th>
+            <th data-k="ask" title="Cheapest open listing (per unit) you can buy right now">Low ask</th>
+            <th data-k="spread" title="Market value minus low ask: your per-unit profit buying at the ask and selling at market">Spread</th>
+            <th data-k="roi" title="Spread as a percentage of the low ask">ROI</th>
+            <th data-k="suggest" title="Suggested listing price: market value + 5% to stay competitive">List +5%</th>
+            <th title="Last hour of trades, 75-second buckets">Trend</th>
+            <th data-k="scannedAt" title="When this item's open listings were last scanned">Fresh</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+
+    <footer id="footer">data: api.torn.com (bazaar/facets · bazaar/prices · bazaar/items) · poll 20s · listings rescan every ~4 min</footer>
+  </section>
+</div>
+
+<script src="../config.js"></script>
+<script>
+/* LumberCorp 2.0 embed: API calls go to the companion proxy.
+   Priority: override written by the companion (bz_api_base) -> deploy-time
+   window.RW_PROXY_URL (config.js) -> same-origin /api (standalone mode). */
+window.BZ_API_BASE = (() => {
+  try {
+    const o = String(localStorage.getItem('bz_api_base') || '').trim().replace(/\/+$/, '');
+    if (o) return o;
+  } catch (e) { /* ignore */ }
+  return String(window.RW_PROXY_URL || '').trim().replace(/\/+$/, '');
+})();
+</script>
+<script>
+'use strict';
+
+/* ---------------- state ---------------- */
+const state = {
+  view: null,            // latest /api/scan payload
+  sortKey: 'roi', sortDir: -1,
+  search: '', type: 'all', profitOnly: false, hasAsk: false,
+  expanded: new Set(),   // facet ids with open detail rows
+  calc: {},              // facetId -> {cost, margin}
+  allAsks: new Map(),    // facetId -> {asks, ts} (full listings, client-side cache)
+  lastPoll: 0,
+};
+const LS_KEY = 'torn_bazaar_api_key';
+
+/* ---------------- utils ---------------- */
+const $ = (sel) => document.querySelector(sel);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function fmtMoney(v, showDec = true) {
+  if (v == null || !isFinite(v)) return '<span class="dim">—</span>';
+  const neg = v < 0 ? '−' : '';
+  const a = Math.abs(v);
+  let s;
+  if (a >= 1e6) s = '$' + (a / 1e6).toFixed(2) + 'M';
+  else if (a >= 1e4) s = '$' + (a / 1e3).toFixed(1) + 'k';
+  else if (showDec) s = '$' + a.toFixed(2).replace(/\.00$/, '');
+  else s = '$' + a.toFixed(0);
+  return neg + s;
+}
+function fmtPct(v) {
+  if (v == null || !isFinite(v)) return '<span class="dim">—</span>';
+  const p = v * 100;
+  const cls = p > 0.05 ? 'pos' : p < -0.05 ? 'neg' : 'dim';
+  return '<span class="' + cls + '">' + (p > 0 ? '+' : '') + p.toFixed(1) + '%</span>';
+}
+function timeAgo(ts) {
+  if (!ts) return '<span class="dim">not yet</span>';
+  const s = Math.max(0, (Date.now() - ts) / 1000);
+  if (s < 60) return Math.floor(s) + 's';
+  if (s < 3600) return Math.floor(s / 60) + 'm';
+  if (s < 86400) return Math.floor(s / 3600) + 'h' + Math.floor((s % 3600) / 60) + 'm';
+  return Math.floor(s / 86400) + 'd';
+}
+
+/* item icon fallback: colored letter avatar (used when no image or image fails) */
+function hueOf(s) { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) % 360; return h; }
+function avatarSpan(name) {
+  const n = String(name || '?');
+  return `<span class="iticon av" style="background:hsl(${hueOf(n)},45%,28%)">${esc(n.charAt(0).toUpperCase())}</span>`;
+}
+window.iconFail = (el) => { el.outerHTML = avatarSpan(el.dataset.n || '?'); };
+
+/* ---------------- key management ---------------- */
+const KEY_HINTS = {
+  '1': 'The key arrived empty.',
+  '2': 'Torn says this key is not valid. Make sure you copied all 16 characters, and that you have not generated a NEW key since (generating one invalidates the old).',
+  '4': 'Rate limited — wait a minute and try again.',
+  '5': 'Rate limited — wait a minute and try again.',
+  '8': 'Your IP is temporarily blocked by Torn — wait a few minutes and try again.',
+  '10': 'Key owner is in federal jail — the key works again after release.',
+  '13': 'Key temporarily disabled (account inactive 7+ days) — log into Torn in your browser first, then retry.',
+  '14': 'Daily API read limit reached — try again tomorrow.',
+  '16': 'The key is valid, but its access level is too low for bazaar data. Generate a new key with Full Access (at minimum Limited Access) in Torn → Settings → API key.',
+  '18': 'Key is paused by the owner — re-enable it in Torn settings.',
+};
+
+function keyErrorMessage(err) {
+  const m = /^(\d+):/.exec(String(err || ''));
+  const hint = m ? (KEY_HINTS[m[1]] || '') : '';
+  return 'Torn rejected the key → ' + esc(err) +
+    (hint ? '<br><span style="color:var(--muted)">' + hint + '</span>' : '');
+}
+
+async function saveKey(rawKey) {
+  const key = String(rawKey || '').trim();
+  const btn = $('#keySave');
+  btn.disabled = true; btn.textContent = 'Connecting…';
+  $('#keyErr').innerHTML = '';
+  if (key && key.length !== 16) {
+    $('#keyErr').innerHTML = 'Torn keys are <b>16 characters</b> — this one is ' + key.length + '. Re-copy it in full (no extra spaces).';
+    btn.disabled = false; btn.textContent = 'Connect & scan the bazaar';
+    return;
+  }
+  try {
+    const res = await fetch(BZ_API_BASE + '/api/key', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key }) });
+    const out = await res.json();
+    if (out.ok) {
+      if (key) localStorage.setItem(LS_KEY, key);
+      else localStorage.removeItem(LS_KEY);
+      $('#keyGate').classList.add('hidden');
+      $('#dash').classList.remove('hidden');
+      poll();
+    } else {
+      $('#keyErr').innerHTML = keyErrorMessage(out.error);
+      if (out.diag && out.diag.keyValid) {
+        const name = out.diag.username ? '<b>' + esc(out.diag.username) + '</b>' : null;
+        const pid = out.diag.playerId ? ' ( #' + out.diag.playerId + ' )' : '';
+        $('#keyErr').innerHTML += `
+          <div style="margin-top:10px;background:#141c2c;border:1px solid #2b3a55;border-radius:8px;padding:11px 13px;font-size:13px">
+            <span style="color:var(--green)">✔ Key is valid</span>${name ? ' — Torn recognizes it as ' + name + pid : ''}.<br>
+            <span style="color:var(--red)">✘ But it can't read bazaar data</span> (error 16 = access level too low).
+            Bazaar market data requires a key with <b>Limited</b> or <b>Full Access</b>.
+            <ol style="margin:8px 0 0;padding-left:20px;color:var(--muted);line-height:1.7">
+              <li>Torn → <b>Settings</b> → <b>API key</b> section</li>
+              <li><b>Generate a new key</b> and pick access level <b>Full</b> (or at least <b>Limited</b>)</li>
+              <li>Paste that <b>new</b> key here — generating a key deactivates the previous one</li>
+            </ol>
+          </div>`;
+      }
+    }
+  } catch (e) {
+    $('#keyErr').innerHTML = 'Could not reach the scanner server: ' + esc(e.message);
+  }
+  btn.disabled = false; btn.textContent = 'Connect & scan the bazaar';
+}
+
+async function refreshKeyChip() {
+  try {
+    const res = await fetch(BZ_API_BASE + '/api/key');
+    const out = await res.json();
+    const chip = $('#keyChip');
+    if (out.set && out.user && out.user.username) {
+      $('#keyChipText').textContent = '👤 ' + out.user.username;
+      $('#keyBtn').classList.remove('hidden');
+    } else if (out.set) {
+      $('#keyChipText').textContent = '👤 key active';
+      $('#keyBtn').classList.remove('hidden');
+    } else {
+      $('#keyChipText').textContent = 'no key';
+      $('#keyBtn').classList.add('hidden');
+    }
+    return out;
+  } catch { return null; }
+}
+
+/* ---------------- polling & rendering ---------------- */
+async function poll() {
+  let v;
+  try {
+    const res = await fetch(BZ_API_BASE + '/api/scan');
+    v = await res.json();
+  } catch { renderOffline(); return; }
+  state.view = v;
+  state.lastPoll = Date.now();
+  if (!v.hasKey) {
+    $('#keyGate').classList.remove('hidden');
+    $('#dash').classList.add('hidden');
+    return;
+  }
+  $('#keyGate').classList.add('hidden');
+  $('#dash').classList.remove('hidden');
+  renderHeader(v);
+  renderStats(v);
+  renderTable(v);
+}
+
+function renderOffline() {
+  const chip = $('#scanChip');
+  chip.className = 'chip bad';
+  $('#scanChipText').textContent = 'server unreachable';
+}
+
+function renderHeader(v) {
+  const chip = $('#scanChip');
+  const api = v.api || {};
+  let cls = 'chip ok', txt = 'live';
+  if (v.keyBad) { cls = 'chip bad'; txt = 'key invalid: ' + v.keyBad; }
+  else if (api.state === 'paused') { cls = 'chip warn'; txt = 'rate-limit pause ' + timeAgo(api.pausedUntil).replace(/<[^>]*>/g, '') + ' left'; }
+  else if (v.meta.scanned < v.meta.totalFacets) { cls = 'chip warn'; txt = 'scanning…'; }
+  chip.className = cls;
+  $('#scanChipText').textContent = txt + (api.callsPerMin ? ' · ' + api.callsPerMin + ' req/min' : '');
+
+  const pct = v.meta.totalFacets ? Math.round(100 * v.meta.scanned / v.meta.totalFacets) : 0;
+  $('#scanFill').style.width = pct + '%';
+  $('#scanLabel').textContent = 'listings scanned ' + v.meta.scanned + '/' + v.meta.totalFacets +
+    (v.meta.lastFullScanAt ? ' · full scan ' + timeAgo(v.meta.lastFullScanAt).replace(/<[^>]*>/g, '') + ' ago' : '');
+  $('#scanReq').textContent = (api.callsPerMin || 0) + ' req/min';
+
+  const ks = (v.meta.pricesAgeMs != null ? Math.round(v.meta.pricesAgeMs / 1000) + 's' : '—');
+  $('#footer').textContent = 'data: api.torn.com · trades updated ' + ks + ' ago · poll 20s · listings rescan every ~4 min';
+}
+
+function renderStats(v) {
+  const rows = v.rows || [];
+  const commodities = rows.filter((r) => r.type === 'commodity').length;
+  const items = rows.length - commodities;
+  const openLists = rows.reduce((s, r) => s + (r.listCount || 0), 0);
+  const vol = rows.reduce((s, r) => s + (r.vol || 0), 0);
+  const trades = rows.reduce((s, r) => s + (r.count || 0), 0);
+  const profitable = rows.filter((r) => r.spread != null && r.spread > 0).length;
+  $('#stats').innerHTML = `
+    <div class="stat"><div class="lbl">Items tracked</div><div class="val">${rows.length}</div><div class="sub">${commodities} commodities · ${items} items</div></div>
+    <div class="stat"><div class="lbl">Open listings</div><div class="val">${openLists.toLocaleString()}</div><div class="sub">across all bazaar items</div></div>
+    <div class="stat"><div class="lbl">1h trade volume</div><div class="val gold">${fmtMoney(vol)}</div><div class="sub">${trades.toLocaleString()} trades</div></div>
+    <div class="stat"><div class="lbl">Profitable now</div><div class="val green">${profitable}</div><div class="sub">market &gt; low ask</div></div>
+  `;
+}
+
+/* ---------------- table ---------------- */
+function sortVal(r, k) {
+  switch (k) {
+    case 'name': return r.name.toLowerCase();
+    case 'market': return r.market;
+    case 'ask': return r.ask;
+    case 'spread': return r.spread;
+    case 'roi': return r.roi;
+    case 'suggest': return r.suggest;
+    case 'count': return r.count;
+    case 'vol': return r.vol;
+    case 'base': return r.base;
+    case 'scannedAt': return r.scannedAt || 0;
+    default: return 0;
+  }
+}
+
+function visibleRows() {
+  if (!state.view) return [];
+  let rows = state.view.rows || [];
+  const q = state.search.trim().toLowerCase();
+  if (q) rows = rows.filter((r) => r.name.toLowerCase().includes(q));
+  if (state.type !== 'all') rows = rows.filter((r) => r.type === state.type);
+  if (state.profitOnly) rows = rows.filter((r) => r.spread != null && r.spread > 0);
+  if (state.hasAsk) rows = rows.filter((r) => r.ask != null);
+  const k = state.sortKey, d = state.sortDir;
+  rows = rows.slice().sort((a, b) => {
+    let va = sortVal(a, k), vb = sortVal(b, k);
+    const na = va == null, nb = vb == null;
+    if (na && nb) return a.name.localeCompare(b.name);
+    if (na) return 1;           // nulls always last regardless of direction
+    if (nb) return -1;
+    if (typeof va === 'string') return d * va.localeCompare(vb);
+    return d * (va - vb);
+  });
+  return rows;
+}
+
+function cellFresh(r) {
+  if (!r.scannedAt) return '<span class="dim">not yet</span>';
+  const age = Date.now() - r.scannedAt;
+  const cls = age > 10 * 60e3 ? 'stale' : '';
+  return '<span class="' + cls + '">' + timeAgo(r.scannedAt) + '</span>';
+}
+
+function rowHtml(r) {
+  const msrc = { avg1h: 'avg 1h', last: 'last sale', base: 'base' }[r.marketSource] || '';
+  const icon = r.image
+    ? `<img class="iticon" src="${esc(r.image)}" alt="" loading="lazy" onerror="iconFail(this)" data-n="${esc(r.name)}">`
+    : avatarSpan(r.name);
+  const range = (r.min != null && r.max != null)
+    ? (r.min === r.max ? fmtMoney(r.min) : '<span class="dim">' + fmtMoney(r.min, false) + '</span> – ' + fmtMoney(r.max, false))
+    : '<span class="dim">—</span>';
+  const spreadCls = r.spread == null ? 'dim' : r.spread > 0 ? 'pos' : r.spread < 0 ? 'neg' : 'dim';
+  return `
+  <tr class="item-row" data-id="${r.id}">
+    <td class="left">${icon}<span class="nm">${esc(r.name)}</span><span class="badge ${r.type}">${r.type === 'item' ? 'item' : 'commodity'}</span> <span class="idn">#${r.id}</span></td>
+    <td>${fmtMoney(r.base)}</td>
+    <td>${fmtMoney(r.market)} <span class="mkt-src">${msrc}</span></td>
+    <td>${range}</td>
+    <td>${r.count ? r.count + (r.vol ? ' <span class="dim">(' + fmtMoney(r.vol, false) + ')</span>' : '') : '<span class="dim">—</span>'}</td>
+    <td>${fmtMoney(r.ask)}${r.listCount ? ' <span class="dim">(' + r.listCount + ')</span>' : ''}</td>
+    <td class="${spreadCls}">${r.spread == null ? '—' : (r.spread > 0 ? '+' : '') + r.spread.toFixed(2)}</td>
+    <td>${fmtPct(r.roi)}</td>
+    <td class="dim">${fmtMoney(r.suggest)}</td>
+    <td><canvas class="spark" data-id="${r.id}"></canvas></td>
+    <td>${cellFresh(r)}</td>
+  </tr>`;
+}
+
+function asksTableHtml(asks) {
+  const rows = asks.map((a, i) => `
+    <tr>
+      <td class="dim">${i + 1}</td>
+      <td>${fmtMoney(a.p)}${a.locked ? ' <span class="lock">🔒</span>' : ''}</td>
+      <td>× ${a.q}</td>
+      <td class="dim">${fmtMoney(a.p * a.q, false)}</td>
+      <td class="dim">${a.u ? '#' + a.u : '—'}</td>
+    </tr>`).join('');
+  return `<table><tr><th class="left">#</th><th>price</th><th>qty</th><th>total</th><th>seller</th></tr>${rows}</table>`;
+}
+
+function fullAsksHtml(data) {
+  const asks = data.asks || [];
+  const units = asks.reduce((s, a) => s + a.q, 0);
+  if (!asks.length) {
+    return `<div class="dim" style="font-size:11px;margin-bottom:6px">0 open offers</div>
+      <div class="sug-empty">No open listings — nothing to buy right now.</div>`;
+  }
+  return `<div class="dim" style="font-size:11px;margin-bottom:6px">${asks.length.toLocaleString()} open offers · ${units.toLocaleString()} units · updated ${timeAgo(data.ts)}${asks.some((a) => a.locked) ? ' · 🔒 = owner-locked (unbuyable)' : ''}</div>` +
+    asksTableHtml(asks);
+}
+
+async function loadAllAsks(id, force = false) {
+  const box = document.getElementById('asks-' + id);
+  if (!box) return;
+  const hit = state.allAsks.get(id);
+  if (hit && !force) { box.innerHTML = fullAsksHtml(hit); return; }
+  box.innerHTML = '<div class="sug-empty"><span class="spin"></span> loading every bazaar offer…</div>';
+  try {
+    const res = await fetch(BZ_API_BASE + '/api/item/asks?facet_id=' + id + (force ? '&fresh=1' : ''));
+    const out = await res.json();
+    if (!out.ok) throw new Error(out.error || 'unknown error');
+    const data = { asks: out.asks || [], ts: out.ts };
+    state.allAsks.set(id, data);
+    const b2 = document.getElementById('asks-' + id);
+    if (b2) b2.innerHTML = fullAsksHtml(data);
+  } catch (e) {
+    const b = document.getElementById('asks-' + id);
+    if (b) b.innerHTML = `<div class="sug-empty" style="color:var(--red)">Couldn't load: ${esc(e.message)} <button type="button" class="mini" onclick="loadAllAsks(${id}, true)">retry</button></div>`;
+  }
+}
+window.loadAllAsks = loadAllAsks;
+
+function detailHtml(r) {
+  const c = state.calc[r.id] || { cost: r.ask != null ? r.ask : (r.market || 0), margin: 0.1 };
+  const hit = state.allAsks.get(r.id);
+  const provisional = hit
+    ? fullAsksHtml(hit)
+    : (r.asks && r.asks.length
+        ? `<div class="dim" style="font-size:11px;margin-bottom:6px">top ${r.asks.length} of ${r.listCount != null ? r.listCount : '?'} offers — loading every listing…</div>` + asksTableHtml(r.asks)
+        : '<div class="sug-empty"><span class="spin"></span> loading every listing…</div>');
+  return `
+  <tr class="detail-row" data-detail="${r.id}">
+    <td colspan="11">
+      <div class="detail-grid">
+        <div>
+          <div class="asks-head">
+            <h4>Bazaar offers — every listing</h4>
+            <span class="sp"></span>
+            <button type="button" class="mini" onclick="loadAllAsks(${r.id}, true)">↻ refresh</button>
+          </div>
+          <div class="fullasks asks" id="asks-${r.id}">${provisional}</div>
+        </div>
+
+        <div>
+          <h4>Last hour</h4>
+          <div style="font-family:var(--mono);font-size:12.5px;line-height:1.9">
+            <div>trades: <b>${r.count || 0}</b> <span class="dim">(buy ${r.buys || 0} · sell ${r.sells || 0})</span></div>
+            <div>volume: <b>${fmtMoney(r.vol)}</b></div>
+            <div>range: <b>${r.min != null ? fmtMoney(r.min) + ' – ' + fmtMoney(r.max) : '—'}</b></div>
+            <div>last sale (any): <b>${fmtMoney(r.lastSale)}</b> · base: <b>${fmtMoney(r.base)}</b></div>
+            ${r.spread != null ? `<div>buy low ask → sell at market: <b class="${r.spread > 0 ? 'pos' : 'neg'}">${r.spread > 0 ? '+' : ''}${r.spread.toFixed(2)}/unit (${fmtPct(r.roi).replace(/<[^>]*>/g, '')})</b></div>` : ''}
+          </div>
+        </div>
+
+        <div class="calc-box">
+          <h4 style="margin:0 0 10px;font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)">My profit calculator</h4>
+          <div class="calc-row">
+            <div>
+              <label for="cost-${r.id}">My cost / unit ($)</label>
+              <input id="cost-${r.id}" type="number" min="0" step="0.01" value="${c.cost}">
+            </div>
+            <div>
+              <label for="margin-${r.id}">Target margin</label>
+              <select id="margin-${r.id}">
+                ${[0.05, 0.1, 0.15, 0.2, 0.3, 0.5].map((m) => `<option value="${m}" ${m === c.margin ? 'selected' : ''}>+${Math.round(m * 100)}%</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          <div class="calc-out" id="calcOut-${r.id}"></div>
+        </div>
+      </div>
+    </td>
+  </tr>`;
+}
+
+function renderCalc(r) {
+  const out = document.getElementById('calcOut-' + r.id);
+  if (!out) return;
+  const costEl = document.getElementById('cost-' + r.id);
+  const marginEl = document.getElementById('margin-' + r.id);
+  const cost = parseFloat(costEl.value);
+  const margin = parseFloat(marginEl.value);
+  if (!isFinite(cost) || cost < 0 || !isFinite(margin)) { out.innerHTML = '<span class="dim">enter your cost to see prices</span>'; return; }
+  const list = cost * (1 + margin);
+  const profit = list - cost;
+  const line = (lbl, val, cls) => `<div class="line"><span>${lbl}</span><b class="${cls || ''}">${val}</b></div>`;
+  let html = `<div class="big">list at ${fmtMoney(list)}</div>` +
+    line('profit / unit', '+' + profit.toFixed(2), 'pos') +
+    line('your markup', '+' + (margin * 100).toFixed(0) + '%', 'dim');
+  if (r.ask != null) {
+    const d = list / r.ask - 1;
+    html += line('vs low ask ' + fmtMoney(r.ask, false), (d >= 0 ? '+' : '') + (d * 100).toFixed(1) + '% ' + (d > 0.005 ? '<span class="dim">(pricier than ask — you may not get bought)</span>' : '<span class="dim">(≤ ask — competitive)</span>'), d >= -0.005 ? 'pos' : 'neg');
+  }
+  if (r.market != null) {
+    const d = list / r.market - 1;
+    html += line('vs market ' + fmtMoney(r.market, false), (d >= 0 ? '+' : '') + (d * 100).toFixed(1) + '%', d > 0.005 ? 'pos' : 'dim');
+  }
+  if (r.ask != null && r.market != null && r.market > r.ask) {
+    html += line('alt: buy ask → sell market', '+' + (r.market - r.ask).toFixed(2) + '/unit', 'gold');
+  }
+  out.innerHTML = html;
+}
+
+function drawSparks() {
+  const v = state.view;
+  if (!v) return;
+  const byId = new Map(v.rows.map((r) => [r.id, r]));
+  document.querySelectorAll('canvas.spark').forEach((cv) => {
+    const r = byId.get(Number(cv.dataset.id));
+    if (!r) return;
+    const dpr = window.devicePixelRatio || 1;
+    const W = 120, H = 30;
+    cv.width = W * dpr; cv.height = H * dpr;
+    const ctx = cv.getContext('2d');
+    ctx.scale(dpr, dpr);
+    const data = r.spark || [];
+    const pts = [];
+    data.forEach((val, i) => { if (val != null) pts.push([i, val]); });
+    if (pts.length < 2) {
+      ctx.fillStyle = '#39445c';
+      ctx.font = '10px monospace';
+      ctx.fillText('no trades yet', 10, 18);
+      return;
+    }
+    let min = Infinity, max = -Infinity;
+    for (const [, val] of pts) { if (val < min) min = val; if (val > max) max = val; }
+    const pad = 4;
+    const X = (i) => (i * W) / (data.length - 1);
+    const Y = (val) => (max === min ? H / 2 : H - pad - ((val - min) / (max - min)) * (H - 2 * pad));
+    const up = pts[pts.length - 1][1] >= pts[0][1];
+    const col = up ? '#37d67a' : '#ff5d5d';
+    // fill
+    ctx.beginPath();
+    ctx.moveTo(X(pts[0][0]), H);
+    for (const [i, val] of pts) ctx.lineTo(X(i), Y(val));
+    ctx.lineTo(X(pts[pts.length - 1][0]), H);
+    ctx.closePath();
+    ctx.fillStyle = up ? 'rgba(55,214,122,.10)' : 'rgba(255,93,93,.10)';
+    ctx.fill();
+    // line
+    ctx.beginPath();
+    pts.forEach(([i, val], idx) => { idx ? ctx.lineTo(X(i), Y(val)) : ctx.moveTo(X(i), Y(val)); });
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+    // last point
+    const li = pts[pts.length - 1];
+    ctx.beginPath();
+    ctx.arc(X(li[0]), Y(li[1]), 2, 0, Math.PI * 2);
+    ctx.fillStyle = col;
+    ctx.fill();
+  });
+}
+
+function activeFilters() {
+  return state.type !== 'all' || state.profitOnly || state.hasAsk;
+}
+
+function clearSearchAndFilters() {
+  state.search = ''; state.type = 'all'; state.profitOnly = false; state.hasAsk = false;
+  const si = $('#search'); if (si) si.value = '';
+  const tf = $('#typeFilter'); if (tf) tf.value = 'all';
+  const po = $('#profitOnly'); if (po) po.checked = false;
+  const ha = $('#hasAsk'); if (ha) ha.checked = false;
+  hideSuggest();
+  renderTable(state.view);
+}
+window.clearSearchAndFilters = clearSearchAndFilters;
+
+function renderTable(v) {
+  const rows = visibleRows();
+  const total = (v.rows || []).length;
+  $('#countNote').textContent = rows.length + ' of ' + total + ' shown';
+  let html = '';
+  if (!rows.length) {
+    const searching = state.search.trim() !== '';
+    let msg;
+    if (!total) msg = 'Waiting for bazaar data… (the key may still be connecting)';
+    else if (searching && activeFilters()) msg = 'No items match &ldquo;' + esc(state.search.trim()) + '&rdquo; with the current filters on.';
+    else if (searching) msg = 'No items match &ldquo;' + esc(state.search.trim()) + '&rdquo;.';
+    else msg = 'No items match the current filters.';
+    const canClear = searching || activeFilters();
+    html = `<tr><td colspan="11" style="text-align:center;padding:44px 16px;color:var(--muted);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px">
+      ${msg}
+      ${canClear ? '<br><br><button type="button" class="mini" onclick="clearSearchAndFilters()">Clear search &amp; filters</button>' : ''}
+    </td></tr>`;
+  } else {
+    for (const r of rows) {
+      html += rowHtml(r);
+      if (state.expanded.has(r.id)) html += detailHtml(r);
+    }
+  }
+  $('#rows').innerHTML = html;
+  drawSparks();
+  // wire interactions
+  document.querySelectorAll('tr.item-row').forEach((tr) => {
+    tr.addEventListener('click', () => {
+      const id = Number(tr.dataset.id);
+      if (state.expanded.has(id)) state.expanded.delete(id);
+      else state.expanded.add(id);
+      renderTable(state.view);
+    });
+  });
+  document.querySelectorAll('.detail-row').forEach((dr) => {
+    const id = Number(dr.dataset.detail);
+    const r = (state.view.rows || []).find((x) => x.id === id);
+    if (!r) return;
+    const costEl = document.getElementById('cost-' + id);
+    const marginEl = document.getElementById('margin-' + id);
+    const apply = () => {
+      state.calc[id] = { cost: parseFloat(costEl.value), margin: parseFloat(marginEl.value) };
+      renderCalc(r);
+    };
+    costEl.addEventListener('input', apply);
+    marginEl.addEventListener('change', apply);
+    renderCalc(r);
+    loadAllAsks(id); // auto-pull every listing for this item when the row opens
+  });
+  // sort arrows
+  document.querySelectorAll('thead th').forEach((th) => {
+    const k = th.dataset.k;
+    const arrow = th.querySelector('.arrow');
+    if (arrow) arrow.remove();
+    if (k && k === state.sortKey) {
+      const s = document.createElement('span');
+      s.className = 'arrow';
+      s.textContent = state.sortDir === 1 ? '▲' : '▼';
+      th.appendChild(s);
+    }
+  });
+}
+
+/* ---------------- csv ---------------- */
+function exportCsv() {
+  const rows = visibleRows();
+  const head = ['name', 'type', 'id', 'base', 'market_value', 'market_source', 'low_ask', 'spread', 'roi_pct', 'list_plus5', 'trades_1h', 'volume_1h'];
+  const lines = [head.join(',')];
+  for (const r of rows) {
+    lines.push([
+      '"' + r.name.replace(/"/g, '""') + '"', r.type, r.id,
+      r.base ?? '', r.market ?? '', r.marketSource,
+      r.ask ?? '', r.spread ?? '', r.roi != null ? (r.roi * 100).toFixed(2) : '',
+      r.suggest ?? '', r.count, r.vol,
+    ].join(','));
+  }
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'torn-bazaar-' + new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-') + '.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+/* ---------------- search autocomplete ---------------- */
+let sugIndex = -1, sugItems = [];
+
+function computeSuggest(q) {
+  if (!state.view || !state.view.rows) return [];
+  const query = q.trim().toLowerCase();
+  if (!query) return [];
+  const starts = [], others = [];
+  for (const r of state.view.rows) {
+    const i = r.name.toLowerCase().indexOf(query);
+    if (i === -1) continue;
+    if (i === 0) starts.push(r);
+    else others.push(r);
+  }
+  starts.sort((a, b) => a.name.length - b.name.length || (b.count || 0) - (a.count || 0));
+  others.sort((a, b) => (b.count || 0) - (a.count || 0));
+  return starts.concat(others).slice(0, 15);
+}
+
+function hideSuggest() {
+  $('#suggest').classList.add('hidden');
+  sugIndex = -1;
+  sugItems = [];
+}
+
+function paintSuggestActive() {
+  document.querySelectorAll('#suggest .sug-item').forEach((el) =>
+    el.classList.toggle('active', Number(el.dataset.i) === sugIndex));
+}
+
+function renderSuggest(q) {
+  const box = $('#suggest');
+  $('#searchClear').classList.toggle('hidden', q.length === 0);
+  if (!q.trim() || !state.view) { hideSuggest(); return; }
+  sugItems = computeSuggest(q);
+  if (!sugItems.length) {
+    sugIndex = -1;
+    box.innerHTML = '<div class="sug-empty">No items match “' + esc(q.trim()) + '”</div>';
+    box.classList.remove('hidden');
+    return;
+  }
+  const query = q.trim().toLowerCase();
+  box.innerHTML = sugItems.map((r, i) => {
+    const idx = r.name.toLowerCase().indexOf(query);
+    const name = esc(r.name.slice(0, idx)) + '<mark>' + esc(r.name.slice(idx, idx + query.length)) + '</mark>' + esc(r.name.slice(idx + query.length));
+    return `<div class="sug-item ${i === sugIndex ? 'active' : ''}" data-i="${i}"><span class="badge ${r.type}">${r.type === 'item' ? 'item' : 'commodity'}</span><span class="nm">${name}</span><span class="sp"></span><span class="mkt">${fmtMoney(r.market)}</span></div>`;
+  }).join('');
+  box.classList.remove('hidden');
+  box.querySelectorAll('.sug-item').forEach((el) => {
+    el.addEventListener('mousedown', (e) => { e.preventDefault(); selectSuggest(Number(el.dataset.i)); });
+    el.addEventListener('mouseenter', () => { sugIndex = Number(el.dataset.i); paintSuggestActive(); });
+  });
+}
+
+function selectSuggest(i) {
+  const r = sugItems[i];
+  if (!r) return;
+  const input = $('#search');
+  input.value = r.name;
+  state.search = r.name;
+  hideSuggest();
+  $('#searchClear').classList.remove('hidden');
+  renderTable(state.view);
+}
+
+/* ---------------- events ---------------- */
+$('#keySave').addEventListener('click', () => saveKey($('#keyInput').value));
+$('#keyInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') saveKey($('#keyInput').value); });
+$('#keyBtn').addEventListener('click', () => {
+  $('#keyGate').classList.remove('hidden');
+  $('#dash').classList.add('hidden');
+  $('#keyInput').value = '';
+  $('#keyErr').textContent = 'Remove the stored key and paste a new one (leave empty to just disconnect).';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+const searchInput = $('#search');
+searchInput.addEventListener('input', (e) => {
+  state.search = e.target.value;
+  sugIndex = -1;
+  renderTable(state.view);
+  renderSuggest(e.target.value);
+});
+searchInput.addEventListener('keydown', (e) => {
+  const open = !$('#suggest').classList.contains('hidden') && sugItems.length;
+  if (e.key === 'ArrowDown' && open) { e.preventDefault(); sugIndex = (sugIndex + 1) % sugItems.length; paintSuggestActive(); }
+  else if (e.key === 'ArrowUp' && open) { e.preventDefault(); sugIndex = (sugIndex - 1 + sugItems.length) % sugItems.length; paintSuggestActive(); }
+  else if (e.key === 'Enter' && open) { e.preventDefault(); selectSuggest(sugIndex >= 0 ? sugIndex : 0); }
+  else if (e.key === 'Escape') { hideSuggest(); }
+});
+searchInput.addEventListener('focus', () => { if (searchInput.value.trim()) { sugIndex = -1; renderSuggest(searchInput.value); } });
+$('#searchClear').addEventListener('click', () => {
+  searchInput.value = '';
+  state.search = '';
+  hideSuggest();
+  renderTable(state.view);
+  searchInput.focus();
+});
+document.addEventListener('click', (e) => { if (!e.target.closest('.searchbox')) hideSuggest(); });
+$('#typeFilter').addEventListener('change', (e) => { state.type = e.target.value; renderTable(state.view); });
+$('#profitOnly').addEventListener('change', (e) => { state.profitOnly = e.target.checked; renderTable(state.view); });
+$('#hasAsk').addEventListener('change', (e) => { state.hasAsk = e.target.checked; renderTable(state.view); });
+$('#sortSel').addEventListener('change', (e) => {
+  const [k, d] = e.target.value.split('-');
+  state.sortKey = k; state.sortDir = d === 'asc' ? 1 : -1;
+  renderTable(state.view);
+});
+$('#csvBtn').addEventListener('click', exportCsv);
+document.querySelectorAll('thead th[data-k]').forEach((th) => {
+  th.addEventListener('click', () => {
+    const k = th.dataset.k;
+    if (k === 'range') return;
+    if (state.sortKey === k) state.sortDir *= -1;
+    else { state.sortKey = k; state.sortDir = (k === 'name' || k === 'base' || k === 'ask') ? 1 : -1; }
+    renderTable(state.view);
+  });
+});
+
+/* ---------------- boot ---------------- */
+(async function boot() {
+  const stored = localStorage.getItem(LS_KEY);
+  if (stored) {
+    $('#keyInput').value = stored;
+    await saveKey(stored); // silently re-attach to the (in-memory) server
+  }
+  refreshKeyChip();
+  setInterval(poll, 20e3);
+  setInterval(refreshKeyChip, 60e3);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
+  poll();
+})();
+</script>
+</body>
+</html>

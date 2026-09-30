@@ -3,7 +3,8 @@
 Contents:
 - `lumbercorp-2/`   the PWA (static site) — includes the embedded rankwars
                     app (`lumbercorp-2/rankwars/`) that powers Live Wars
-- `proxy/`          tiny Torn API v2 + FF Scouter proxy (powers Live Wars)
+- `proxy/`          tiny proxy — Torn API v2 + FF Scouter + the Bazaar Scanner engine
+                    (powers Live Wars and the Bazaar tab)
 - `render.yaml`     Render Blueprint (deploys BOTH services in one click)
 
 ## Option A — Blueprint (recommended)
