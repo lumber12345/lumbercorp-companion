@@ -106,6 +106,9 @@
   /* ---- bazaar sub tabs ---- */
   #bzFrame{width:100%;height:clamp(560px,80vh,1100px);border:1px solid var(--border2);border-radius:14px;background:#0b0e14;display:block;margin-top:12px}
 
+  /* ================= the game ================= */
+  #gsFrame{width:100%;height:clamp(560px,82vh,1200px);border:1px solid var(--border2);border-radius:14px;background:#0b0d10;display:block;margin-top:12px}
+
   /* ================= target finder ================= */
   #tfFrame{width:100%;height:clamp(560px,80vh,1100px);border:1px solid var(--border2);border-radius:14px;background:#0b0d10;display:block;margin-top:12px}
   .tf-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 2px 12px}
@@ -150,7 +153,7 @@
     backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
     border-top:1px solid var(--border);
     padding:6px 8px calc(6px + env(safe-area-inset-bottom));
-    grid-template-columns:repeat(8, 1fr);gap:2px;
+    grid-template-columns:repeat(9, 1fr);gap:2px;
   }
   .tabbar button{
     background:none;border:none;color:var(--faint);cursor:pointer;
@@ -443,6 +446,7 @@
     <button class="navitem" data-page="alerts"><span class="ni">🔔</span> Alerts <span class="badge" id="alertBadge" hidden>0</span></button>
     <button class="navitem" data-page="bazaar"><span class="ni">🛒</span> Bazaar</button>
     <button class="navitem" data-page="targets"><span class="ni">🎯</span> Targets</button>
+    <button class="navitem" data-page="game"><span class="ni">🎮</span> The Game</button>
     <button class="navitem" data-page="settings"><span class="ni">⚙️</span> Settings</button>
     <div class="railfoot">
       <button class="modebadge" id="modeBadge" title="Toggle demo / live mode">
@@ -607,6 +611,14 @@
       </div><!-- /tfview-local -->
     </section>
 
+    <!-- ============ THE GAME ============ -->
+    <section id="page-game" hidden>
+      <div class="card setcard" id="gsCard" hidden></div>
+      <div id="gsWrap" hidden>
+        <iframe id="gsFrame" title="The Game — Blackstone Online" src="about:blank" referrerpolicy="no-referrer"></iframe>
+      </div>
+    </section>
+
     <!-- ============ STATS ============ -->
     <section id="page-stats" hidden>
       <h2 class="sec">Faction</h2>
@@ -741,6 +753,7 @@
   <button data-page="alerts"><span class="ti">🔔</span>Alerts<span class="badge" id="alertBadgeM" hidden>0</span></button>
   <button data-page="bazaar"><span class="ti">🛒</span>Bazaar</button>
   <button data-page="targets"><span class="ti">🎯</span>Targets</button>
+  <button data-page="game"><span class="ti">🎮</span>Game</button>
   <button data-page="settings"><span class="ti">⚙️</span>Setup</button>
 </nav>
 
@@ -831,7 +844,7 @@ function flagEmoji(cc){
 }
 
 /* ---------- settings ---------- */
-const APP_VERSION = "2.25.0";
+const APP_VERSION = "2.26.0";
 const DEFAULT_SETTINGS = {
   mode: "demo", apiKey: "", refresh: 60,
   theme: "dark", accent: "amber",
@@ -1365,6 +1378,7 @@ const PAGES = {
   alerts:    ["Alerts", "Notifications & activity"],
   bazaar:    ["Bazaar Finder", "Hunt the cheapest listings"],
   targets:   ["Target Finder", "Scout & track attack targets"],
+  game:      ["The Game", "Blackstone Online"],
   settings:  ["Settings", "Make it yours"]
 };
 function goto(page){
@@ -1382,6 +1396,7 @@ function goto(page){
   if(page === "rankwars"){ rwEnter(); }
   if(page === "bazaar"){ bzEnter(); }
   if(page === "targets"){ tfEnter(); }
+  if(page === "game"){ gsEnter(); }
   if(page === "settings"){ renderSettings(); }
   renderAll(); // cheap refresh of dynamic bits for the new page
   window.scrollTo({ top: 0 });
@@ -1851,6 +1866,7 @@ function renderAll(){
   if(state.page === "rankwars") rwEnter();
   if(state.page === "bazaar") bzEnter();
   if(state.page === "targets") tfEnter();
+  if(state.page === "game") gsEnter();
   renderMode();
 }
 
@@ -2339,6 +2355,71 @@ function tfTryRemote(){
   tfApplyView();
 }
 function tfEnter(){ tfApplyView(); }
+
+/* ============================== THE GAME =================================== */
+/* Embeds https://blackstone-online.onrender.com/ — wake-aware like the other
+ * deployment tabs: ping → wake card → retry loop → unreachable card with the
+ * Render free-hours hint and an open-in-new-tab escape hatch. */
+const GAME_REMOTE = "https://blackstone-online.onrender.com/";
+const gameState = { tries: 0, timer: null, frameSrc: null };
+function gamePing(){
+  return new Promise((resolve) => {
+    let done = false;
+    const t = setTimeout(() => { if(!done){ done = true; resolve(false); } }, 6000);
+    fetch(GAME_REMOTE, { mode: "no-cors", cache: "no-store" })
+      .then(() => { if(!done){ done = true; clearTimeout(t); resolve(true); } })
+      .catch(() => { if(!done){ done = true; clearTimeout(t); resolve(false); } });
+  });
+}
+function gameCard(html){
+  const c = $("gsCard");
+  if(html == null){ c.hidden = true; c.innerHTML = ""; return; }
+  c.hidden = false;
+  c.innerHTML = html;
+  const r = $("btnGsRetry");
+  if(r) r.addEventListener("click", () => { gameState.tries = 0; gsWake(); });
+}
+function gameSetFrame(url){
+  if(gameState.frameSrc === url) return;
+  $("gsFrame").src = url;
+  gameState.frameSrc = url;
+}
+async function gsWake(){
+  const up = await gamePing();
+  if(state.page !== "game") return;
+  if(up){
+    if(gameState.timer){ clearTimeout(gameState.timer); gameState.timer = null; }
+    $("gsCard").hidden = true;
+    $("gsWrap").hidden = false;
+    gameSetFrame(GAME_REMOTE);
+    return;
+  }
+  $("gsWrap").hidden = true;
+  gameState.tries++;
+  const waking = gameState.tries <= 12;
+  if(waking){
+    gameCard(`<div class="setrow"><div><div class="st">⏳ Waking blackstone-online.onrender.com…</div>
+    <div class="sd">Free Render instances sleep after 15 minutes idle — the first load can take up to a minute. Retrying automatically…</div></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" id="btnGsRetry">⟳ Retry now</button></div></div>`);
+  } else {
+    gameCard(`<div class="setrow"><div><div class="st">🔴 blackstone-online.onrender.com is unreachable</div>
+    <div class="sd">Free instances sleep when idle — if it stays down, your Render <b>free instance hours</b> may have run out this month (check the Render dashboard) or the service was suspended.</div></div></div>
+    <div class="setrow" style="gap:8px;flex-wrap:wrap">
+      <button class="btn sm" id="btnGsRetry">⟳ Retry</button>
+      <a class="btn sm primary" href="${GAME_REMOTE}" target="_blank" rel="noopener">↗ Open in new tab</a>
+    </div>`);
+  }
+  if(waking){
+    if(gameState.timer) clearTimeout(gameState.timer);
+    gameState.timer = setTimeout(() => { if(state.page === "game") gsWake(); }, 5000);
+  }
+}
+function gsEnter(){
+  if(gameState.timer){ clearTimeout(gameState.timer); gameState.timer = null; }
+  $("gsCard").hidden = true;
+  $("gsWrap").hidden = true;
+  gsWake();
+}
 /* ============================== TICKER ============================== */
 /* Advance bars client-side each second (works for demo & between live polls). */
 function simTick(dt){
@@ -2462,7 +2543,7 @@ let palSel = 0, palItems = [];
 function palSources(){
   const out = [];
   for(const p of Object.keys(PAGES)) out.push({ icon: PAGES[p] ? "" : "", title: "Go to " + PAGES[p][0], sub: PAGES[p][1], key: "page", run: () => goto(p) });
-  const pIcons = { dashboard:"⚡", flight:"✈️", rankwars:"⚔️", stats:"📈", alerts:"🔔", bazaar:"🛒", targets:"🎯", settings:"⚙️" };
+  const pIcons = { dashboard:"⚡", flight:"✈️", rankwars:"⚔️", stats:"📈", alerts:"🔔", bazaar:"🛒", targets:"🎯", game:"🎮", settings:"⚙️" };
   for(const o of out) o.icon = pIcons[o.title.replace("Go to ", "").toLowerCase()] || "➜";
   for(const d of DESTINATIONS) out.push({ icon: flagEmoji(d.flag), title: "Fly to " + d.country, sub: d.city + " · fastest " + fmtDur(Math.min(...Object.values(d.times)) * 60), key: "flight", run: () => { goto("flight"); $("planDest").value = d.country; renderPlanInfo(); } });
   for(const a of actionsList()) out.push({ icon: a.icon || "🔗", title: "Open " + a.name, sub: "torn.com", key: "link", run: () => window.open(a.url, "_blank") });
