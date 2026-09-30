@@ -107,6 +107,7 @@
   #bzFrame{width:100%;height:clamp(560px,80vh,1100px);border:1px solid var(--border2);border-radius:14px;background:#0b0e14;display:block;margin-top:12px}
 
   /* ================= target finder ================= */
+  #tfFrame{width:100%;height:clamp(560px,80vh,1100px);border:1px solid var(--border2);border-radius:14px;background:#0b0d10;display:block;margin-top:12px}
   .tf-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 2px 12px}
   .tf-bar input{flex:1;min-width:220px;background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-weight:600}
   .tf-bar input:focus{outline:none;border-color:var(--accent)}
@@ -588,15 +589,22 @@
 
     <!-- ============ TARGET FINDER ============ -->
     <section id="page-targets" hidden>
+      <div class="card setcard" id="tfRemoteCard" hidden></div>
+      <div id="tfview-remote" hidden>
+        <iframe id="tfFrame" title="Target Finder — lumbercorp-target-finder" src="about:blank" referrerpolicy="no-referrer"></iframe>
+      </div>
+      <div id="tfview-local" hidden>
       <div class="tf-bar">
         <input type="text" id="tfIds" placeholder="Target IDs — e.g. 241381, 715465, 2205433" autocomplete="off" spellcheck="false">
         <button class="btn sm primary" id="tfGo">🔎 Scout</button>
         <button class="btn sm" id="tfFaction">From faction</button>
+        <button class="btn sm" id="btnTfRemote" title="Load the deployed Target Finder app">🌐 My deployment</button>
       </div>
       <div id="tfStatus"></div>
       <div id="tfResult"></div>
       <h2 class="sec">📌 Watchlist</h2>
       <div id="tfWatch"></div>
+      </div><!-- /tfview-local -->
     </section>
 
     <!-- ============ STATS ============ -->
@@ -823,7 +831,7 @@ function flagEmoji(cc){
 }
 
 /* ---------- settings ---------- */
-const APP_VERSION = "2.24.0";
+const APP_VERSION = "2.25.0";
 const DEFAULT_SETTINGS = {
   mode: "demo", apiKey: "", refresh: 60,
   theme: "dark", accent: "amber",
@@ -2241,11 +2249,96 @@ function tfRender(){
     w.innerHTML = '<div class="empty">Nothing pinned yet — scout targets and tap ☆ to keep them here.</div>';
   }
 }
-function tfEnter(){
+/* ---- Targets ▸ deployment-first embed (same pattern as Bazaar/Wars) ----
+ * Default: https://lumbercorp-target-finder.onrender.com/ with a wake card
+ * for sleeping Render instances. "Use built-in app" switches to the native
+ * scout UI above (v1 API, no backend needed); session-only choice. */
+const TFD_REMOTE = "https://lumbercorp-target-finder.onrender.com/";
+const tfViewState = { src: null, tries: 0, timer: null, frameSrc: null };
+function tfSource(){ return tfViewState.src === "local" ? "local" : "remote"; }
+function tfPingRemote(){
+  return new Promise((resolve) => {
+    let done = false;
+    const t = setTimeout(() => { if(!done){ done = true; resolve(false); } }, 6000);
+    fetch(TFD_REMOTE, { mode: "no-cors", cache: "no-store" })
+      .then(() => { if(!done){ done = true; clearTimeout(t); resolve(true); } })
+      .catch(() => { if(!done){ done = true; clearTimeout(t); resolve(false); } });
+  });
+}
+function tfCard(html){
+  const c = $("tfRemoteCard");
+  if(html == null){ c.hidden = true; c.innerHTML = ""; return; }
+  c.hidden = false;
+  c.innerHTML = html;
+  const r = $("btnTfRetry");
+  if(r) r.addEventListener("click", () => { tfViewState.tries = 0; tfApplyView(); });
+  const b = $("btnTfLocal");
+  if(b) b.addEventListener("click", () => {
+    tfViewState.src = "local";
+    tfViewState.tries = 0;
+    if(tfViewState.timer){ clearTimeout(tfViewState.timer); tfViewState.timer = null; }
+    tfApplyView();
+  });
+}
+function tfSetFrame(url){
+  if(tfViewState.frameSrc === url) return;
+  $("tfFrame").src = url;
+  tfViewState.frameSrc = url;
+}
+async function tfWake(){
+  const up = await tfPingRemote();
+  if(tfSource() !== "remote") return;
+  if(up){
+    if(tfViewState.timer){ clearTimeout(tfViewState.timer); tfViewState.timer = null; }
+    $("tfRemoteCard").hidden = true;
+    $("tfview-remote").hidden = false;
+    tfSetFrame(TFD_REMOTE);
+    return;
+  }
+  $("tfview-remote").hidden = true;
+  tfViewState.tries++;
+  const waking = tfViewState.tries <= 12;
+  if(waking){
+    tfCard(`<div class="setrow"><div><div class="st">⏳ Waking lumbercorp-target-finder.onrender.com…</div>
+    <div class="sd">Free Render instances sleep after 15 minutes idle — the first load can take up to a minute. Retrying automatically…</div></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" id="btnTfRetry">⟳ Retry now</button></div></div>`);
+  } else {
+    tfCard(`<div class="setrow"><div><div class="st">🔴 lumbercorp-target-finder.onrender.com is unreachable</div>
+    <div class="sd">Free instances sleep when idle — if it stays down, your Render <b>free instance hours</b> may have run out this month (check the Render dashboard) or the service was suspended. Meanwhile, the built-in scout below works straight off the Torn API.</div></div></div>
+    <div class="setrow" style="gap:8px;flex-wrap:wrap">
+      <button class="btn sm" id="btnTfRetry">⟳ Retry deployment</button>
+      <button class="btn sm primary" id="btnTfLocal">Use built-in app</button>
+    </div>`);
+  }
+  if(waking){
+    if(tfViewState.timer) clearTimeout(tfViewState.timer);
+    tfViewState.timer = setTimeout(() => { if(state.page === "targets" && tfSource() === "remote") tfWake(); }, 5000);
+  }
+}
+function tfApplyView(){
+  if(tfViewState.timer){ clearTimeout(tfViewState.timer); tfViewState.timer = null; }
+  if(tfSource() === "remote"){
+    $("tfRemoteCard").hidden = true;
+    $("tfview-local").hidden = true;
+    $("tfview-remote").hidden = true;
+    tfWake();
+    return;
+  }
+  $("tfRemoteCard").hidden = true;
+  $("tfview-remote").hidden = true;
+  $("tfview-local").hidden = false;
   tfLoad();
   tfRender();
-  if(!tfKey()) tfStatus(tfChip("Add your API key in Settings — a Public key works for scouting profiles", "warn"));
+  if(!tfKey()) tfStatus(tfChip("Built-in scout: add your API key in Settings — a Public key works", "warn"));
 }
+function tfTryRemote(){
+  tfViewState.src = null;
+  tfViewState.tries = 0;
+  if(tfViewState.timer){ clearTimeout(tfViewState.timer); tfViewState.timer = null; }
+  toast("🌐 Loading lumbercorp-target-finder.onrender.com…", "ok");
+  tfApplyView();
+}
+function tfEnter(){ tfApplyView(); }
 /* ============================== TICKER ============================== */
 /* Advance bars client-side each second (works for demo & between live polls). */
 function simTick(dt){
@@ -2566,6 +2659,7 @@ function wire(){
   });
   $("tfIds").addEventListener("keydown", (e) => { if(e.key === "Enter"){ e.preventDefault(); $("tfGo").click(); } });
   $("tfFaction").addEventListener("click", tfFromFaction);
+  $("btnTfRemote").addEventListener("click", tfTryRemote);
   $("tfResult").addEventListener("click", (e) => {
     const b = e.target.closest("[data-tfwatch]");
     if(!b) return;
