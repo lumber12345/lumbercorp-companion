@@ -271,8 +271,16 @@
   .dest .dc{font-weight:800;font-size:14px;line-height:1.15}
   .dest .dy{font-size:11px;color:var(--faint);margin-top:1px}
   .dest .dtime{margin-left:auto;font-size:11px;font-weight:800;color:var(--accent);background:var(--card2);border:1px solid var(--border);padding:3px 8px;border-radius:8px;font-variant-numeric:tabular-nums;white-space:nowrap}
-  .dest .ditems{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}
-  .dest .itemchip{font-size:10.5px;background:var(--card2);border:1px solid var(--border);color:var(--muted);border-radius:7px;padding:2px 7px;font-weight:600}
+  .dest .ditems{display:block;margin-top:10px}
+  .dest .mrow{display:flex;align-items:center;gap:6px;font-size:11px;padding:3.5px 0;border-bottom:1px dashed var(--border)}
+  .dest .mrow .mn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;color:var(--muted)}
+  .dest .mrow .mq{color:var(--faint);font-variant-numeric:tabular-nums;font-weight:600}
+  .dest .mrow .mp{color:var(--text);font-weight:700;font-variant-numeric:tabular-nums}
+  .dest .mrow .mprof{font-weight:800;font-variant-numeric:tabular-nums;color:var(--faint)}
+  .dest .mrow .mprof.up{color:var(--ok)}
+  .dest .mrow .mprof.down{color:var(--bad)}
+  .dest .bestflip{margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:11px;font-weight:800;color:var(--accent)}
+  .dest .itemchip{font-size:10.5px;background:var(--card2);border:1px solid var(--border);color:var(--muted);border-radius:7px;padding:2px 7px;font-weight:600;display:inline-block;margin-top:7px}
   .dest .itemchip b{color:var(--text)}
   .dest .itemchip .zero{opacity:.45}
 
@@ -764,7 +772,7 @@ function flagEmoji(cc){
 }
 
 /* ---------- settings ---------- */
-const APP_VERSION = "2.0.6";
+const APP_VERSION = "2.0.7";
 const DEFAULT_SETTINGS = {
   mode: "demo", apiKey: "", refresh: 60,
   theme: "dark", accent: "amber",
@@ -931,7 +939,30 @@ function demoItems(){
     {id:20, name:"Feathery Hotel Coupon", type:"Other", market_value:9500, buy_price:10500, sell_price:8500,   icon:"🎟️"},
     {id:21, name:"LSD",              type:"Drug",    market_value:21000,  buy_price:23000,  sell_price:19000,  icon:"💊"},
     {id:22, name:"Cannabis",         type:"Drug",    market_value:6800,   buy_price:7500,   sell_price:6100,   icon:"🌿"},
-    {id:23, name:"Energy Drink",     type:"Drug",    market_value:2800,   buy_price:3100,   sell_price:2500,   icon:"🥤"}
+    {id:23, name:"Energy Drink",     type:"Drug",    market_value:2800,   buy_price:3100,   sell_price:2500,   icon:"🥤"},
+    {id:101, name:"Dahlia",          type:"Flower",  market_value:450,    buy_price:480,    sell_price:410,    icon:"🌸"},
+    {id:102, name:"Crocus",          type:"Flower",  market_value:750,    buy_price:800,    sell_price:690,    icon:"🌸"},
+    {id:103, name:"Orchid",          type:"Flower",  market_value:850,    buy_price:900,    sell_price:780,    icon:"🌸"},
+    {id:104, name:"Heather",         type:"Flower",  market_value:3200,   buy_price:3400,   sell_price:2950,   icon:"🌸"},
+    {id:105, name:"Ceibo",           type:"Flower",  market_value:650,    buy_price:700,    sell_price:600,    icon:"🌸"},
+    {id:106, name:"Edelweiss",       type:"Flower",  market_value:1000,   buy_price:1050,   sell_price:920,    icon:"🌸"},
+    {id:107, name:"Cherry Blossom",  type:"Flower",  market_value:650,    buy_price:700,    sell_price:600,    icon:"🌸"},
+    {id:108, name:"Peony",           type:"Flower",  market_value:5500,   buy_price:5800,   sell_price:5050,   icon:"🌸"},
+    {id:109, name:"Banana Orchid",   type:"Flower",  market_value:4500,   buy_price:4700,   sell_price:4100,   icon:"🌸"},
+    {id:110, name:"African Violet",  type:"Flower",  market_value:2200,   buy_price:2350,   sell_price:2050,   icon:"🌸"},
+    {id:111, name:"Tribulus Omanense", type:"Flower", market_value:6500,   buy_price:6800,   sell_price:5950,   icon:"🌸"},
+    {id:112, name:"Wolverine Plushie", type:"Plushie", market_value:60,   buy_price:70,     sell_price:55,     icon:"🧸"},
+    {id:113, name:"Monkey Plushie",  type:"Plushie", market_value:450,    buy_price:480,    sell_price:415,    icon:"🧸"},
+    {id:114, name:"Stingray Plushie", type:"Plushie", market_value:450,   buy_price:480,    sell_price:415,    icon:"🧸"},
+    {id:115, name:"Nessie Plushie",  type:"Plushie", market_value:250,    buy_price:270,    sell_price:230,    icon:"🧸"},
+    {id:116, name:"Red Fox Plushie", type:"Plushie", market_value:1100,   buy_price:1150,   sell_price:1000,   icon:"🧸"},
+    {id:117, name:"Chamois Plushie", type:"Plushie", market_value:450,    buy_price:480,    sell_price:415,    icon:"🧸"},
+    {id:118, name:"Camel Plushie",   type:"Plushie", market_value:14500,  buy_price:15200,  sell_price:13200,  icon:"🧸"},
+    {id:119, name:"Lion Plushie",    type:"Plushie", market_value:450,    buy_price:480,    sell_price:415,    icon:"🧸"},
+    {id:120, name:"Panda Plushie",   type:"Plushie", market_value:450,    buy_price:480,    sell_price:415,    icon:"🧸"},
+    {id:121, name:"Cayman Plushie",  type:"Plushie", market_value:450,    buy_price:480,    sell_price:415,    icon:"🧸"},
+    {id:122, name:"Jaguar Plushie",  type:"Plushie", market_value:10500,  buy_price:11000,  sell_price:9600,   icon:"🧸"},
+    {id:123, name:"Katana",          type:"Weapon",  market_value:27000,  buy_price:28500,  sell_price:24800,  icon:"⚔️"}
   ];
 }
 
@@ -942,7 +973,7 @@ const state = {
   user: demoUser(),
   faction: demoFaction(),
   items: demoItems(),
-  itemCache: null,          // live Torn item DB (id/name/market_value)
+  itemCache: store.get("lc2_itemdb", null),  // live Torn item DB (id/name/market_value)
   lastUpdated: 0,
   statsLoaded: false,
   statsError: null,
@@ -1049,6 +1080,7 @@ async function loadLive(){
   state.user = Object.assign(emptyUser(), state.user, u);
   state.lastUpdated = Date.now();
   state.caps = { basic: true, money: u.money_onhand != null, stats: false, faction: false };
+  fetchItemDB();
   try{
     const ps = await tornUser("personalstats");
     if(ps && ps.personalstats){
@@ -1235,6 +1267,29 @@ function countryItems(d){
     }
   }
   return list;
+}
+/* Torn's item DB (all market prices). The `torn/items` selection is
+   public-level: any valid key can read it. Cached 7 days in localStorage. */
+async function fetchItemDB(force){
+  if(state.mode !== "live" || !settings.apiKey) return;
+  const cached = store.get("lc2_itemdb", null);
+  const ts = store.get("lc2_itemdb_ts", 0);
+  if(!force && cached && Date.now() - ts < 7 * 864e5){
+    state.itemCache = cached;
+    return;
+  }
+  try{
+    const j = await tornFetch(`${API}/torn/?selections=items&key=${encodeURIComponent(settings.apiKey.trim())}&comment=lumbercorp2`);
+    if(j && j.items){
+      const arr = Object.entries(j.items).map(([id, it]) =>
+        ({ id: Number(id), name: it.name, type: it.type, market_value: it.market_value || 0 }));
+      state.itemCache = arr;
+      store.set("lc2_itemdb", arr);
+      store.set("lc2_itemdb_ts", Date.now());
+      logAct("🏷️", `Item DB loaded — market prices for ${fmtInt(arr.length)} items`);
+      renderAll();
+    }
+  }catch(e){ /* fail soft — demo/curated values remain */ }
 }
 /* Torn restocks abroad markets every 15 minutes (fixed cycle). */
 function restockInfo(){
@@ -1468,20 +1523,54 @@ function renderDestGrid(){
   grid.innerHTML = DESTINATIONS.map(d => {
     const soonest = Math.min(...Object.values(d.times));
     const y = yataFor(d.country);
-    let chips = d.items.slice(0, 3).map(it => {
+    const priceRow = it => {
       const feed = yataStockFor(d.country, it.n);
       const qty = feed ? feed.quantity : null;
-      return `<span class="itemchip">${escHtml(it.n)} ${qty == null ? "" : (qty > 0 ? "<b>×" + fmtInt(qty) + "</b>" : '<span class="zero">×0</span>')}</span>`;
+      const shop = (feed && feed.cost) ? feed.cost : it.price;
+      const mkt = itemMarketValue(it.n);
+      const profit = mkt != null ? mkt - shop : null;
+      return `<div class="mrow">
+        <span class="mn">${escHtml(it.n)}</span>
+        <span class="mq">${qty == null ? "" : qty > 0 ? "×" + fmtInt(qty) : '<span style="opacity:.45">×0</span>'}</span>
+        <span class="mp">${fmtMoney(shop)}</span>
+        <span class="mprof ${profit == null ? "" : profit >= 0 ? "up" : "down"}" title="market ${mkt != null ? fmtMoney(mkt) : "unknown"}">${profit == null ? "→ —" : "→ " + (profit >= 0 ? "+" : "") + fmtMoney(profit)}</span>
+      </div>`;
+    };
+    const all = countryItems(d).map(it => {
+      const feed = yataStockFor(d.country, it.n);
+      const shop = (feed && feed.cost) ? feed.cost : it.price;
+      const mkt = itemMarketValue(it.n);
+      return { it, qty: feed ? feed.quantity : null, shop, mkt,
+               profit: mkt != null ? mkt - shop : null, curated: !!it.curated };
+    });
+    /* curated items first, then the best-profit feed items with known prices */
+    const ranked = all.filter(r => r.curated)
+      .concat(all.filter(r => !r.curated && r.profit != null).sort((a, b) => b.profit - a.profit));
+    const shown = ranked.slice(0, 4);
+    const rowsHtml = shown.map(r => {
+      const p = r.profit;
+      return `<div class="mrow">
+        <span class="mn">${escHtml(r.it.n)}</span>
+        <span class="mq">${r.qty == null ? "" : r.qty > 0 ? "×" + fmtInt(r.qty) : '<span style="opacity:.45">×0</span>'}</span>
+        <span class="mp">${fmtMoney(r.shop)}</span>
+        <span class="mprof ${p == null ? "" : p >= 0 ? "up" : "down"}" title="market ${r.mkt != null ? fmtMoney(r.mkt) : "unknown"}">${p == null ? "→ —" : "→ " + (p >= 0 ? "+" : "") + fmtMoney(p)}</span>
+      </div>`;
     }).join("");
-    const extra = Math.max(0, countryItems(d).length - 3);
+    const extra = Math.max(0, all.length - shown.length);
     const more = extra > 0 ? `<span class="itemchip">+${extra} more</span>` : "";
+    let best = null;
+    for(const r of all){
+      if(r.profit == null) continue;
+      if(!best || r.profit > best.p) best = { n: r.it.n, p: r.profit };
+    }
+    const bestHtml = best && best.p > 0 ? `<div class="bestflip">🔥 Best flip: ${escHtml(best.n)} +${fmtMoney(best.p)}/unit</div>` : "";
     return `<div class="card dest" data-dest="${escHtml(d.country)}">
       <div class="dhead">
         <span class="fl">${flagEmoji(d.flag)}</span>
         <div><div class="dc">${escHtml(d.country)}</div><div class="dy">${escHtml(d.city)}</div></div>
         <span class="dtime">✈ ${fmtDur(soonest * 60)}</span>
       </div>
-      <div class="ditems">${chips}${more}</div>
+      <div class="ditems">${rowsHtml}${more}${bestHtml}</div>
     </div>`;
   }).join("");
   grid.querySelectorAll("[data-dest]").forEach(el =>
@@ -1543,6 +1632,9 @@ function renderMarket(){
   else if(sort === "spread"){
     list.sort((a, b) => flipPct(b) - flipPct(a));
   } else list.sort((a, b) => a.name.localeCompare(b.name));
+  const CAP = 300;
+  const total = list.length;
+  list = list.slice(0, CAP);
   $("mktList").innerHTML = list.map(i => {
     const wl = state.watchlist.includes(i.id);
     const sp = flipPct(i);
@@ -1553,7 +1645,8 @@ function renderMarket(){
       <span class="spread ${sp >= 0 ? "up" : "down"}">${sp >= 0 ? "+" : ""}${sp.toFixed(1)}% flip</span>
       <div class="ip">${fmtMoney(i.market_value)}<small>buy ${fmtMoney(i.buy_price)} · sell ${fmtMoney(i.sell_price)}</small></div>
     </div>`;
-  }).join("") || `<div class="empty">No items match.</div>`;
+  }).join("") + (total > CAP ? `<div class="empty">Showing ${CAP} of ${fmtInt(total)} items — search to narrow.</div>` : "");
+  if(!list.length) $("mktList").innerHTML = `<div class="empty">No items match.</div>`;
   $("mktList").querySelectorAll("[data-star]").forEach(b => {
     b.addEventListener("click", () => {
       const id = Number(b.dataset.star);
@@ -1685,7 +1778,7 @@ function renderSettings(){
     $("capsRow").hidden = false;
     $("capsTxt").innerHTML =
       `${c.basic ? "✅" : "⛔"} profile &amp; bars · ${c.money ? "✅" : "⛔"} cash &amp; networth · ${c.stats ? "✅" : "⛔"} career stats · ${c.faction ? "✅" : "⛔"} faction` +
-      ` — ⛔ items need a higher key level (Limited/Full) from Torn → Settings → API keys`;
+      ` — ${state.itemCache ? "✅ market prices (item DB)" : "⏳ market prices (item DB loads after sync)"}`;
   } else {
     $("capsRow").hidden = true;
   }
@@ -2143,7 +2236,7 @@ function setMode(m){
     settings.mode = "demo"; state.mode = "demo"; saveSettings();
     if(liveTimer) clearTimeout(liveTimer);
     state.user = demoUser(); state.faction = demoFaction();
-    state.items = demoItems(); state.itemCache = null;
+    state.items = demoItems();   /* itemCache kept: market prices are public data */
     state.statsLoaded = false; state.statsError = null; state.factionError = null; state.factionErrorCode = null; state.factionless = false; state.caps = null;
     state.lastUpdated = Date.now();
     renderMode(); renderAll();
