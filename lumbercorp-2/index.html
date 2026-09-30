@@ -794,7 +794,7 @@ function flagEmoji(cc){
 }
 
 /* ---------- settings ---------- */
-const APP_VERSION = "2.21.0";
+const APP_VERSION = "2.22.0";
 const DEFAULT_SETTINGS = {
   mode: "demo", apiKey: "", refresh: 60,
   theme: "dark", accent: "amber",
@@ -1899,13 +1899,13 @@ async function rwWake(){
 }
 function rwEnter(){ rwState.tries = 0; rwFrameOn(); }
 
-/* ===== Bazaar — your bazaar deployment, zero setup =======================
- * Default: embeds https://bazaar-i5o8.onrender.com (it carries its own
+/* ===== Bazaar — bazaar-finder deployment, zero setup =====================
+ * Default: embeds https://bazaar-finder.onrender.com (it carries its own
  * scanner backend, so nothing to configure). A proxy pasted on this tab
  * (settings.bzProxy) — or "Use built-in app" — switches to the vendored
  * copy running against your proxy. Free Render instances sleep after
  * 15 min idle, so a wake card pings and retries automatically. */
-const BZ_REMOTE = "https://bazaar-i5o8.onrender.com";
+const BZ_REMOTE = "https://bazaar-finder.onrender.com";
 const bzViewState = { src: null, tries: 0, timer: null, frameSrc: null };
 function bzApiBase(){
   return (settings.bzProxy || settings.rwProxy || (window.RW_PROXY_URL || "")).trim().replace(/\/$/, "");
@@ -1939,7 +1939,7 @@ function bzTryRemote(){
   bzViewState.src = null;
   bzViewState.tries = 0;
   if(bzViewState.timer){ clearTimeout(bzViewState.timer); bzViewState.timer = null; }
-  toast("🌐 Loading bazaar-i5o8.onrender.com…", "ok");
+  toast("🌐 Loading bazaar-finder.onrender.com…", "ok");
   bzApplyView();
 }
 function bzCard(html){
@@ -2052,11 +2052,11 @@ async function bzWake(){
   }
   const waking = bzViewState.tries <= 12;
   if(waking){
-    bzCard(`<div class="setrow"><div><div class="st">⏳ Waking bazaar-i5o8.onrender.com…</div>
+    bzCard(`<div class="setrow"><div><div class="st">⏳ Waking bazaar-finder.onrender.com…</div>
     <div class="sd">Free Render instances sleep after 15 minutes idle — the first load can take up to a minute. Retrying automatically…</div></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" id="btnBzRetry">⟳ Retry now</button></div></div>`);
   } else {
-    bzCard(`<div class="setrow"><div><div class="st">🔴 bazaar-i5o8.onrender.com is unreachable</div>
+    bzCard(`<div class="setrow"><div><div class="st">🔴 bazaar-finder.onrender.com is unreachable</div>
     <div class="sd">Free instances sleep when idle — but if it stays down, your Render <b>free instance hours</b> may have run out this month (check the Render dashboard) or the service was suspended. Meanwhile: paste any working LumberCorp proxy URL below and the built-in scanner will run through it.</div></div></div>
     <div class="setrow">
       <input type="text" id="bzProxyInput" placeholder="https://your-proxy.onrender.com" style="flex:1;min-width:220px;background:var(--card2);border:1px solid var(--border2);border-radius:10px;padding:9px 11px;font-weight:600">
