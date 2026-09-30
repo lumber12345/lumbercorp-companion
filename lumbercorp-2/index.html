@@ -2140,16 +2140,3 @@ init();
 </script>
 </body>
 </html>
-periodic stock feed re-poll (every 3 min)
-  setInterval(() => fetchYata(false), 3 * 60 * 1000);
-  if("serviceWorker" in navigator && location.protocol.startsWith("http")){
-    navigator.serviceWorker.register("sw.js").catch(() => {});
-  }
-  setTimeout(() => {
-    toast("👋 Welcome to <b>LumberCorp 2.0</b> — press <span class='kbadge'>Ctrl K</span> to jump anywhere.");
-  }, 600);
-}
-init();
-</script>
-</body>
-</html>
