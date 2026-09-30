@@ -121,6 +121,12 @@
   .tf-k{color:var(--muted)} .tf-v{font-weight:700;text-align:right}
   .tf-ok{color:var(--ok)} .tf-bad{color:var(--bad)} .tf-warn{color:var(--warn)}
 
+  /* ================= home mode segment ================= */
+  .seg{display:inline-flex;gap:4px;background:var(--card2);border:1px solid var(--border2);border-radius:12px;padding:4px}
+  .seg button{background:none;border:none;color:var(--muted);font-weight:700;font-size:12.5px;padding:7px 14px;border-radius:9px;cursor:pointer;transition:.15s}
+  .seg button:hover{color:var(--text)}
+  .seg button.active{background:var(--accent);color:#141005;box-shadow:0 2px 10px var(--glow)}
+
   /* ================= rank wars ================= */
   /* ---- rank wars sub tabs (mirror of the rankwars app tabs) ---- */
   .rw-war{padding:14px 15px;cursor:pointer;transition:.15s;position:relative}
@@ -473,6 +479,22 @@
 
     <!-- ============ DASHBOARD ============ -->
     <section id="page-dashboard">
+      <div class="card setcard" style="margin-bottom:12px">
+        <div class="setrow">
+          <div style="min-width:140px"><div class="st">Torn API key</div><div class="sd">Stored only in this browser</div></div>
+          <div class="keyrow">
+            <input type="password" id="homeKey" placeholder="Paste your API key…" autocomplete="off">
+            <button class="btn sm" id="btnHomeSaveKey">Save</button>
+          </div>
+        </div>
+        <div class="setrow">
+          <div><div class="st">Mode</div><div class="sd">Demo shows sample data · Live reads your real Torn account</div></div>
+          <div class="seg" id="homeModeSeg">
+            <button data-homemode="demo">Demo</button>
+            <button data-homemode="live">Live</button>
+          </div>
+        </div>
+      </div>
       <div class="card idcard">
         <div class="avatar" id="idAvatar">S</div>
         <div class="idmain">
@@ -832,7 +854,7 @@ function flagEmoji(cc){
 }
 
 /* ---------- settings ---------- */
-const APP_VERSION = "2.28.0";
+const APP_VERSION = "2.29.0";
 const DEFAULT_SETTINGS = {
   mode: "demo", apiKey: "", refresh: 60,
   theme: "dark", accent: "amber",
@@ -1844,6 +1866,9 @@ function renderMode(){
   // keep the Settings segment buttons in sync the moment mode flips
   document.querySelectorAll("[data-mode]").forEach(b =>
     b.classList.toggle("active", b.dataset.mode === state.mode));
+  const seg = document.querySelectorAll("#homeModeSeg button");
+  seg.forEach(b => b.classList.toggle("active", b.dataset.homemode === state.mode));
+  if($("homeKey") && document.activeElement !== $("homeKey")) $("homeKey").value = settings.apiKey || "";
 }
 function renderAll(){
   renderDashboard();
@@ -2595,6 +2620,16 @@ function wire(){
     settings.apiKey = e.target.value.trim(); saveSettings();
     toast("API key saved", "ok");
   });
+  $("btnHomeSaveKey").addEventListener("click", () => {
+    settings.apiKey = ($("homeKey").value || "").trim(); saveSettings();
+    if(!settings.apiKey){ toast("Paste a key first", "warn"); return; }
+    toast("API key saved", "ok");
+    if(state.mode === "live") scheduleLive();
+    else setMode("live");
+  });
+  $("homeKey").addEventListener("keydown", e => { if(e.key === "Enter"){ e.preventDefault(); $("btnHomeSaveKey").click(); } });
+  document.querySelectorAll("#homeModeSeg button").forEach(b =>
+    b.addEventListener("click", () => setMode(b.dataset.homemode)));
   $("btnTestKey").addEventListener("click", async () => {
     settings.apiKey = $("setKey").value.trim(); saveSettings();
     if(!settings.apiKey){ toast("Paste a key first", "warn"); return; }
