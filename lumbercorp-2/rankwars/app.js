@@ -140,6 +140,25 @@ const S = {
   focus: null,         // {id, start, end} to restore input focus after re-render
 };
 
+/* ---- LumberCorp 2.0 embed: boot into ?tab= and follow companion sub-tabs ---- */
+try {
+  const __t = new URLSearchParams(location.search).get('tab');
+  if (['wars', 'room', 'hits', 'wrep', 'history', 'about'].includes(__t)) S.tab = __t;
+} catch (e) { /* ignore */ }
+window.addEventListener('message', (e) => {
+  const d = e && e.data;
+  if (!d || typeof d.rwtab !== 'string') return;
+  if (!['wars', 'room', 'hits', 'wrep', 'history', 'about'].includes(d.rwtab)) return;
+  S.tab = d.rwtab;
+  if (S.tab === 'history') {
+    S.report = { warId: null, data: null, loading: false, err: null };
+    if (!S.hist.rows && S.hist.faction) loadHistory(S.hist.faction);
+  }
+  renderTabs(); renderView();
+  if (S.tab === 'wrep' && (S.key || S.demo) && !S.wrep.rows && !S.wrep.loading) loadWarReportWars();
+  if ((S.tab === 'room' || S.tab === 'hits') && (S.key || S.demo)) refreshData();
+});
+
 function persist() {
   store.rw_key = S.key;
   store.rw_demo = S.demo ? '1' : '0';

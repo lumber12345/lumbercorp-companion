@@ -104,6 +104,18 @@
   .clockbox b{color:var(--muted);font-variant-numeric:tabular-nums;font-weight:600}
 
   /* ================= rank wars ================= */
+  /* ---- rank wars sub tabs (mirror of the rankwars app tabs) ---- */
+  .rw-subtabs{display:flex;gap:6px;margin:0 2px 12px;overflow-x:auto;scrollbar-width:none}
+  .rw-subtabs::-webkit-scrollbar{display:none}
+  .rw-subtabs button{
+    display:inline-flex;align-items:center;gap:6px;flex:0 0 auto;
+    background:var(--card);border:1px solid var(--border);color:var(--muted);
+    font-size:12.5px;font-weight:700;padding:8px 14px;border-radius:99px;cursor:pointer;transition:.15s;
+    white-space:nowrap;
+  }
+  .rw-subtabs button:hover{color:var(--text);border-color:var(--border2)}
+  .rw-subtabs button.active{background:var(--card3);color:var(--text);border-color:var(--accent);box-shadow:0 2px 12px var(--glow)}
+  .rw-subtabs .live-dot{width:7px;height:7px;border-radius:50%;background:var(--ok);animation:pulse 2s infinite}
   .rw-war{padding:14px 15px;cursor:pointer;transition:.15s;position:relative}
   .rw-war:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 8px 20px var(--glow)}
   .rw-war .rwtop{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -530,6 +542,14 @@
 
     <!-- ============ RANK WARS ============ -->
     <section id="page-rankwars" hidden>
+      <nav class="rw-subtabs" id="rwSubTabs">
+        <button class="active" data-rwtab="wars"><span class="live-dot"></span> Live Wars</button>
+        <button data-rwtab="room">War Room</button>
+        <button data-rwtab="hits">The Hit Club</button>
+        <button data-rwtab="wrep">War Report</button>
+        <button data-rwtab="history">History &amp; Reports</button>
+        <button data-rwtab="about">Setup &amp; About</button>
+      </nav>
       <div class="card setcard" id="rwSetup" hidden>
         <div class="setrow">
           <div><div class="st">⚡ Connect live data</div>
@@ -773,7 +793,7 @@ function flagEmoji(cc){
 }
 
 /* ---------- settings ---------- */
-const APP_VERSION = "2.5.1";
+const APP_VERSION = "2.6.0";
 const DEFAULT_SETTINGS = {
   mode: "demo", apiKey: "", refresh: 60,
   theme: "dark", accent: "amber",
@@ -1796,7 +1816,7 @@ function renderAll(){
  * in an iframe above. The companion syncs the API key + proxy into its
  * storage (rw_key / rw_proxy_override); the app polls, renders and
  * auto-refreshes itself exactly like the standalone original. */
-const rwState = { frameReady: false };
+const rwState = { frameReady: false, tab: "wars" };
 /* saved setting wins; falls back to the deploy-time default (Render RW_PROXY_URL) */
 function rwEffectiveProxy(){
   return (settings.rwProxy || (window.RW_PROXY_URL || "")).trim().replace(/\/$/, "");
@@ -1817,7 +1837,17 @@ function rwFrameOn(){
   $("rwLiveWrap").hidden = !rwEmbedOn();
   if(rwEmbedOn()){
     rwSyncEmbed();
-    if(!rwState.frameReady){ $("rwFrame").src = "rankwars/index.html"; rwState.frameReady = true; }
+    if(!rwState.frameReady){ $("rwFrame").src = "rankwars/index.html" + (rwState.tab !== "wars" ? "?tab=" + rwState.tab : ""); rwState.frameReady = true; }
+  }
+}
+function rwSetTab(t){
+  if(!["wars","room","hits","wrep","history","about"].includes(t)) return;
+  rwState.tab = t;
+  document.querySelectorAll("#rwSubTabs button").forEach(b =>
+    b.classList.toggle("active", b.dataset.rwtab === t));
+  if(rwEmbedOn()){
+    try{ $("rwFrame").contentWindow.postMessage({ rwtab: t }, "*"); }
+    catch(e){ /* frame not booted yet — load handler re-sends rwState.tab */ }
   }
 }
 function rwEnter(){ rwFrameOn(); }
@@ -2135,6 +2165,11 @@ function wire(){
 
 
   // rank wars
+  document.querySelectorAll("#rwSubTabs button").forEach(b =>
+    b.addEventListener("click", () => rwSetTab(b.dataset.rwtab)));
+  $("rwFrame").addEventListener("load", () => {
+    try{ $("rwFrame").contentWindow.postMessage({ rwtab: rwState.tab }, "*"); }catch(e){}
+  });
   $("btnRwProxy").addEventListener("click", () => {
     settings.rwProxy = ($("rwProxyInput").value || "").trim().replace(/\/$/, "");
     saveSettings();
