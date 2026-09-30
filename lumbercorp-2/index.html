@@ -106,6 +106,20 @@
   /* ---- bazaar sub tabs ---- */
   #bzFrame{width:100%;height:clamp(560px,80vh,1100px);border:1px solid var(--border2);border-radius:14px;background:#0b0e14;display:block;margin-top:12px}
 
+  /* ================= target finder ================= */
+  .tf-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 2px 12px}
+  .tf-bar input{flex:1;min-width:220px;background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-weight:600}
+  .tf-bar input:focus{outline:none;border-color:var(--accent)}
+  .tf-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:10px}
+  .tf-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:13px 14px;transition:.15s}
+  .tf-card:hover{border-color:var(--accent)}
+  .tf-top{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+  .tf-name{font-weight:800;font-size:14.5px}
+  .tf-sub{color:var(--muted);font-size:11.5px}
+  .tf-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;font-size:12.5px}
+  .tf-k{color:var(--muted)} .tf-v{font-weight:700;text-align:right}
+  .tf-ok{color:var(--ok)} .tf-bad{color:var(--bad)} .tf-warn{color:var(--warn)}
+
   /* ================= rank wars ================= */
   /* ---- rank wars sub tabs (mirror of the rankwars app tabs) ---- */
   .rw-war{padding:14px 15px;cursor:pointer;transition:.15s;position:relative}
@@ -135,7 +149,7 @@
     backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
     border-top:1px solid var(--border);
     padding:6px 8px calc(6px + env(safe-area-inset-bottom));
-    grid-template-columns:repeat(7, 1fr);gap:2px;
+    grid-template-columns:repeat(8, 1fr);gap:2px;
   }
   .tabbar button{
     background:none;border:none;color:var(--faint);cursor:pointer;
@@ -427,6 +441,7 @@
     <button class="navitem" data-page="stats"><span class="ni">📈</span> Stats</button>
     <button class="navitem" data-page="alerts"><span class="ni">🔔</span> Alerts <span class="badge" id="alertBadge" hidden>0</span></button>
     <button class="navitem" data-page="bazaar"><span class="ni">🛒</span> Bazaar</button>
+    <button class="navitem" data-page="targets"><span class="ni">🎯</span> Targets</button>
     <button class="navitem" data-page="settings"><span class="ni">⚙️</span> Settings</button>
     <div class="railfoot">
       <button class="modebadge" id="modeBadge" title="Toggle demo / live mode">
@@ -571,6 +586,19 @@
       </div>
     </section>
 
+    <!-- ============ TARGET FINDER ============ -->
+    <section id="page-targets" hidden>
+      <div class="tf-bar">
+        <input type="text" id="tfIds" placeholder="Target IDs — e.g. 241381, 715465, 2205433" autocomplete="off" spellcheck="false">
+        <button class="btn sm primary" id="tfGo">🔎 Scout</button>
+        <button class="btn sm" id="tfFaction">From faction</button>
+      </div>
+      <div id="tfStatus"></div>
+      <div id="tfResult"></div>
+      <h2 class="sec">📌 Watchlist</h2>
+      <div id="tfWatch"></div>
+    </section>
+
     <!-- ============ STATS ============ -->
     <section id="page-stats" hidden>
       <h2 class="sec">Faction</h2>
@@ -704,6 +732,7 @@
   <button data-page="stats"><span class="ti">📈</span>Stats</button>
   <button data-page="alerts"><span class="ti">🔔</span>Alerts<span class="badge" id="alertBadgeM" hidden>0</span></button>
   <button data-page="bazaar"><span class="ti">🛒</span>Bazaar</button>
+  <button data-page="targets"><span class="ti">🎯</span>Targets</button>
   <button data-page="settings"><span class="ti">⚙️</span>Setup</button>
 </nav>
 
@@ -794,7 +823,7 @@ function flagEmoji(cc){
 }
 
 /* ---------- settings ---------- */
-const APP_VERSION = "2.23.0";
+const APP_VERSION = "2.24.0";
 const DEFAULT_SETTINGS = {
   mode: "demo", apiKey: "", refresh: 60,
   theme: "dark", accent: "amber",
@@ -1327,6 +1356,7 @@ const PAGES = {
   stats:     ["Stats", "Career & faction"],
   alerts:    ["Alerts", "Notifications & activity"],
   bazaar:    ["Bazaar Finder", "Hunt the cheapest listings"],
+  targets:   ["Target Finder", "Scout & track attack targets"],
   settings:  ["Settings", "Make it yours"]
 };
 function goto(page){
@@ -1343,6 +1373,7 @@ function goto(page){
   if(page === "stats"){ renderStats(); }
   if(page === "rankwars"){ rwEnter(); }
   if(page === "bazaar"){ bzEnter(); }
+  if(page === "targets"){ tfEnter(); }
   if(page === "settings"){ renderSettings(); }
   renderAll(); // cheap refresh of dynamic bits for the new page
   window.scrollTo({ top: 0 });
@@ -1811,6 +1842,7 @@ function renderAll(){
   if(state.page === "stats") renderStats();
   if(state.page === "rankwars") rwEnter();
   if(state.page === "bazaar") bzEnter();
+  if(state.page === "targets") tfEnter();
   renderMode();
 }
 
@@ -2093,6 +2125,127 @@ async function bzWake(){
   }
 }
 function bzEnter(){ bzApplyView(); }
+
+/* ============================== TARGET FINDER ============================== */
+/* Scouts player profiles via the Torn v1 API (browser-safe, no proxy) using
+ * the app key. Scores attackability: status, life left, money on hand. */
+const tfState = { rows: [], watch: null, loading: false };
+function tfKey(){ return (settings.apiKey || "").trim(); }
+function tfStatus(html){ $("tfStatus").innerHTML = html; }
+function tfChip(txt, cls){ return '<span class="chip ' + (cls || "") + '">' + txt + "</span>"; }
+function tfLoad(){
+  try{ tfState.watch = JSON.parse(localStorage.getItem("lc2_targets") || "[]"); }
+  catch(e){ tfState.watch = []; }
+}
+function tfSave(){
+  try{ localStorage.setItem("lc2_targets", JSON.stringify(tfState.watch.slice(0, 30))); }catch(e){}
+}
+function tfHospital(ts){
+  if(!ts) return null;
+  const s = ts - Date.now() / 1000;
+  return s > 0 ? fmtDur(s) : null;
+}
+async function tfScout(ids){
+  if(tfState.loading) return;
+  if(!ids.length){ tfStatus(tfChip("⚠️ No IDs — paste at least one target ID", "warn")); return; }
+  if(!tfKey()){ tfStatus(tfChip("⚠️ No API key — add one in Settings", "bad")); return; }
+  tfState.loading = true;
+  tfStatus(tfChip("🔎 Scouting " + ids.length + " target" + (ids.length > 1 ? "s" : "") + "…", "warn"));
+  const rows = [];
+  for(const id of ids.slice(0, 25)){
+    try{
+      const j = await tornFetch(API + "/user/" + id + "/?selections=basic,profile&key=" + encodeURIComponent(tfKey()) + "&comment=lumbercorp2");
+      const st = (j.status && j.status.state) || "unknown";
+      const hosp = tfHospital(j.status && j.status.until);
+      const life = j.life || {};
+      const lifePct = life.maximum ? Math.round((life.current / life.maximum) * 100) : null;
+      let score = 0, flags = [];
+      if(st === "okay"){ score += 3; flags.push('<span class="tf-ok">status: OK</span>'); }
+      else if(st === "hospital"){ score += hosp ? 1 : 0; flags.push('<span class="tf-warn">hospital ' + (hosp || "…") + "</span>"); }
+      else { flags.push('<span class="tf-bad">' + st + "</span>"); }
+      if(lifePct != null){
+        flags.push('<span class="' + (lifePct <= 40 ? "tf-ok" : lifePct <= 75 ? "tf-warn" : "tf-bad") + '">life ' + lifePct + "%</span>");
+        if(lifePct <= 60) score += 2;
+      }
+      const money = (j.money_onhand != null) ? +j.money_onhand : null;
+      if(money != null){
+        flags.push("💰 " + fmtMoney(money));
+        if(money > 0) score += 1;
+      }
+      flags.push("⚡ ~" + Math.max(1, Math.round((+j.level || 1) / 2.5)) + " EN");
+      rows.push({
+        id: +id, name: j.name || ("#" + id), level: +j.level || 0,
+        status: st, hosp: hosp, lifePct, money,
+        lastAction: (j.last_action && j.last_action.relative) || "",
+        score, flags: flags.join(" · ")
+      });
+    }catch(e){
+      rows.push({ id: +id, name: "#" + id, err: e.code != null ? describeApiError(e) : e.message, score: -1, flags: "" });
+    }
+  }
+  rows.sort((a, b) => b.score - a.score);
+  tfState.rows = rows;
+  tfState.loading = false;
+  tfStatus(tfChip("🟢 " + rows.filter(r => !r.err).length + "/" + rows.length + " scouted · sorted best-first", "ok"));
+  tfRender();
+}
+async function tfFromFaction(){
+  if(!tfKey()){ tfStatus(tfChip("⚠️ No API key — add one in Settings", "bad")); return; }
+  tfStatus(tfChip("📡 Fetching faction members… (needs a key with faction access)", "warn"));
+  try{
+    const me = await tornUser("profile").catch(() => null);
+    const fid = me && me.faction && me.faction.faction_id;
+    if(!fid){ tfStatus(tfChip("⚠️ Your key can't read your faction — paste member IDs manually", "warn")); return; }
+    const j = await tornFetch(API + "/faction/" + fid + "/?selections=basic&key=" + encodeURIComponent(tfKey()) + "&comment=lumbercorp2");
+    const list = (j.members && (Array.isArray(j.members) ? j.members : Object.values(j.members))) || [];
+    const ids = list.map(m => +m.id).filter(Boolean).slice(0, 25);
+    if(!ids.length){ tfStatus(tfChip("⚠️ No member IDs returned — faction access may be off", "warn")); return; }
+    $("tfIds").value = ids.join(", ");
+    tfScout(ids);
+  }catch(e){
+    tfStatus(tfChip("⚠️ " + (e.code != null ? describeApiError(e) : e.message), "bad"));
+  }
+}
+function tfScoreChip(r){
+  if(r.err) return tfChip("error", "bad");
+  if(r.score >= 4) return tfChip("★ prime", "ok");
+  if(r.score >= 2) return tfChip("decent", "warn");
+  return tfChip("tough", "");
+}
+function tfRender(){
+  const rows = tfState.rows;
+  if(!rows.length){ $("tfResult").innerHTML = ""; return; }
+  let html = '<div class="tf-cards">';
+  for(const r of rows){
+    const inWatch = tfState.watch.some(w => w.id === r.id);
+    html += '<div class="tf-card"><div class="tf-top">' +
+      '<div style="flex:1"><div class="tf-name"><a href="https://www.torn.com/profiles.php?XID=' + r.id + '" target="_blank" rel="noopener" style="color:var(--text)">' + r.name + "</a> " + tfScoreChip(r) + '</div>' +
+      '<div class="tf-sub">ID ' + r.id + " · level " + r.level + (r.lastAction ? " · " + r.lastAction : "") + "</div></div>" +
+      '<button class="btn sm" data-tfwatch="' + r.id + '" data-tfname="' + r.name + '" title="Pin to watchlist">' + (inWatch ? "★" : "☆") + "</button></div>" +
+      '<div class="tf-grid">' +
+      '<div class="tf-k">Status</div><div class="tf-v">' + (r.err ? "—" : r.status + (r.hosp ? " (" + r.hosp + ")" : "")) + "</div>" +
+      '<div class="tf-k">Life</div><div class="tf-v ' + (r.lifePct != null && r.lifePct <= 40 ? "tf-ok" : "") + '">' + (r.lifePct != null ? r.lifePct + "%" : "—") + "</div>" +
+      '<div class="tf-k">Money</div><div class="tf-v">' + (r.money != null ? fmtMoney(r.money) : "—") + "</div>" +
+      '<div class="tf-k">Flags</div><div class="tf-v" style="text-align:right;font-weight:600;font-size:11.5px">' + (r.err ? r.err : r.flags) + "</div>" +
+      "</div></div>";
+  }
+  html += "</div>";
+  $("tfResult").innerHTML = html;
+  const w = $("tfWatch");
+  if(tfState.watch.length){
+    w.innerHTML = '<div class="tf-cards">' + tfState.watch.map(x =>
+      '<div class="tf-card"><div class="tf-top"><div style="flex:1"><div class="tf-name"><a href="https://www.torn.com/profiles.php?XID=' + x.id + '" target="_blank" rel="noopener" style="color:var(--text)">' + x.name + '</a></div><div class="tf-sub">ID ' + x.id + "</div></div>" +
+      '<a class="btn sm" href="https://www.torn.com/loader.php?sid=attack&user2ID=' + x.id + '" target="_blank" rel="noopener">⚔️ Attack</a>' +
+      '<button class="btn sm" data-tfunwatch="' + x.id + '">✕</button></div></div>').join("") + "</div>";
+  } else {
+    w.innerHTML = '<div class="empty">Nothing pinned yet — scout targets and tap ☆ to keep them here.</div>';
+  }
+}
+function tfEnter(){
+  tfLoad();
+  tfRender();
+  if(!tfKey()) tfStatus(tfChip("Add your API key in Settings — a Public key works for scouting profiles", "warn"));
+}
 /* ============================== TICKER ============================== */
 /* Advance bars client-side each second (works for demo & between live polls). */
 function simTick(dt){
@@ -2216,7 +2369,7 @@ let palSel = 0, palItems = [];
 function palSources(){
   const out = [];
   for(const p of Object.keys(PAGES)) out.push({ icon: PAGES[p] ? "" : "", title: "Go to " + PAGES[p][0], sub: PAGES[p][1], key: "page", run: () => goto(p) });
-  const pIcons = { dashboard:"⚡", flight:"✈️", rankwars:"⚔️", stats:"📈", alerts:"🔔", bazaar:"🛒", settings:"⚙️" };
+  const pIcons = { dashboard:"⚡", flight:"✈️", rankwars:"⚔️", stats:"📈", alerts:"🔔", bazaar:"🛒", targets:"🎯", settings:"⚙️" };
   for(const o of out) o.icon = pIcons[o.title.replace("Go to ", "").toLowerCase()] || "➜";
   for(const d of DESTINATIONS) out.push({ icon: flagEmoji(d.flag), title: "Fly to " + d.country, sub: d.city + " · fastest " + fmtDur(Math.min(...Object.values(d.times)) * 60), key: "flight", run: () => { goto("flight"); $("planDest").value = d.country; renderPlanInfo(); } });
   for(const a of actionsList()) out.push({ icon: a.icon || "🔗", title: "Open " + a.name, sub: "torn.com", key: "link", run: () => window.open(a.url, "_blank") });
@@ -2406,6 +2559,27 @@ function wire(){
   });
 
 
+  // target finder
+  $("tfGo").addEventListener("click", () => {
+    const ids = ($("tfIds").value || "").split(/[\s,;]+/).map(x => x.trim()).filter(x => /^\d+$/.test(x)).map(Number);
+    tfScout([...new Set(ids)]);
+  });
+  $("tfIds").addEventListener("keydown", (e) => { if(e.key === "Enter"){ e.preventDefault(); $("tfGo").click(); } });
+  $("tfFaction").addEventListener("click", tfFromFaction);
+  $("tfResult").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-tfwatch]");
+    if(!b) return;
+    const id = +b.dataset.tfwatch, name = b.dataset.tfname;
+    if(tfState.watch.some(w => w.id === id)) tfState.watch = tfState.watch.filter(w => w.id !== id);
+    else tfState.watch.push({ id, name });
+    tfSave(); tfRender();
+  });
+  $("tfWatch").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-tfunwatch]");
+    if(!b) return;
+    tfState.watch = tfState.watch.filter(w => w.id !== +b.dataset.tfunwatch);
+    tfSave(); tfRender();
+  });
   // bazaar finder
   // rank wars
   $("btnRwProxy").addEventListener("click", () => {
