@@ -122,6 +122,27 @@
     min-width:16px;height:16px;border-radius:99px;display:grid;place-items:center;padding:0 4px;
   }
 
+  /* ================= rank wars ================= */
+  .rw-war{padding:14px 15px;cursor:pointer;transition:.15s;position:relative}
+  .rw-war:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 8px 20px var(--glow)}
+  .rw-war .rwtop{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .rw-war .rwvs{font-size:13px;font-weight:800}
+  .rw-war .rwscore{font-size:14px;font-weight:800;font-variant-numeric:tabular-nums}
+  .rw-war .dom{height:8px;border-radius:99px;background:var(--card3);overflow:hidden;display:flex;margin:10px 0 6px}
+  .rw-war .dom .a{background:linear-gradient(90deg,#2fbf71,#63d99c)}
+  .rw-war .dom .b{background:linear-gradient(90deg,#e5484d,#f0797d)}
+  .rw-war .rwmeta{display:flex;gap:10px;font-size:11.5px;color:var(--faint);flex-wrap:wrap;font-variant-numeric:tabular-nums}
+  .rw-score-big{font-size:22px;font-weight:900;font-variant-numeric:tabular-nums}
+  .rw-facname{font-weight:800;font-size:14px}
+  .rw-roster .tbl td{padding:7px 9px}
+  .hosp{color:var(--bad);font-weight:700;font-variant-numeric:tabular-nums}
+  .okay{color:var(--ok);font-weight:700}
+  .jail{color:var(--warn);font-weight:700;font-variant-numeric:tabular-nums}
+  .away{color:var(--info);font-weight:700}
+  .chainbar{display:flex;align-items:center;gap:9px;font-size:11.5px;color:var(--muted)}
+  .chainbar .track{flex:1;height:6px}
+  .chainbar .fill.chainfill{background:linear-gradient(90deg,var(--travel),#e0b7ff);transition:width 1s linear}
+
   /* ================= bottom tabbar (mobile) ================= */
   .tabbar{
     display:none;position:fixed;left:0;right:0;bottom:0;z-index:60;
@@ -462,6 +483,7 @@
     <nav class="subtabs" id="subtabs">
       <button class="active" data-page="dashboard"><span>⚡</span> Home</button>
       <button data-page="flight"><span>✈️</span> Flight</button>
+      <button data-page="rankwars"><span>⚔️</span> Rank Wars</button>
       <button data-page="stats"><span>📈</span> Stats</button>
       <button data-page="alerts"><span>🔔</span> Alerts <span class="badge" id="subBadgeAlerts" hidden>0</span></button>
       <button data-page="companion"><span>🧰</span> Toolkit</button>
@@ -544,6 +566,29 @@
         <button class="btn sm" id="btnReport">📣 Report stock</button>
       </div>
       <div class="destgrid" id="destGrid" style="margin-top:12px"></div>
+    </section>
+
+    <!-- ============ RANK WARS ============ -->
+    <section id="page-rankwars" hidden>
+      <div class="card setcard" id="rwSetup" hidden>
+        <div class="setrow">
+          <div><div class="st">⚡ Connect live data</div>
+          <div class="sd">Torn's v2 API blocks browser calls, so this tab uses your <b>Rank Wars proxy</b>. Deploy <a href="https://github.com/lumber12345/rankwars" target="_blank" rel="noopener">lumber12345/rankwars</a> free on Render (its render.yaml is one-click), then paste the URL — e.g. <code>https://torn-rank-wars.onrender.com</code></div></div>
+        </div>
+        <div class="setrow">
+          <input type="text" id="rwProxyInput" placeholder="https://your-rankwars-proxy.onrender.com" style="flex:1;min-width:220px;background:var(--card2);border:1px solid var(--border2);border-radius:10px;padding:9px 11px;font-weight:600">
+          <button class="btn sm primary" id="btnRwProxy">Save &amp; load</button>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin:0 2px;flex-wrap:wrap">
+        <span class="chip" id="rwStatus">idle</span>
+        <span class="chip" id="rwFac" hidden></span>
+        <span class="spacer"></span>
+        <button class="btn sm" id="btnRwRefresh">⟳ Refresh</button>
+      </div>
+      <div id="rwDetail"></div>
+      <h2 class="sec">Wars</h2>
+      <div class="grid g2" id="rwWarsList"></div>
     </section>
 
     <!-- ============ STATS ============ -->
@@ -637,6 +682,13 @@
           <div class="seg" style="margin-left:auto">
             <button data-mode="demo">Demo</button>
             <button data-mode="live">Live</button>
+          </div>
+        </div>
+        <div class="setrow">
+          <div style="min-width:150px"><div class="st">Rank Wars proxy</div><div class="sd">URL of your deployed <a href="https://github.com/lumber12345/rankwars" target="_blank" rel="noopener">rankwars</a> app — powers the Rank Wars tab</div></div>
+          <div class="keyrow">
+            <input type="text" id="setRwProxy" placeholder="https://torn-rank-wars.onrender.com" autocomplete="off">
+            <button class="btn sm" id="btnSetRwProxy">Save</button>
           </div>
         </div>
         <div class="setrow" id="capsRow" hidden>
@@ -810,12 +862,12 @@ function flagEmoji(cc){
 }
 
 /* ---------- settings ---------- */
-const APP_VERSION = "2.1.0";
+const APP_VERSION = "2.2.0";
 const DEFAULT_SETTINGS = {
   mode: "demo", apiKey: "", refresh: 60,
   theme: "dark", accent: "amber",
   notifEnergy: true, notifFlight: true, notifCooldown: true,
-  customActions: []
+  customActions: [], rwProxy: ""
 };
 let settings = Object.assign({}, DEFAULT_SETTINGS, store.get("lc2_settings", {}));
 
@@ -1338,6 +1390,7 @@ function restockInfo(){
 const PAGES = {
   dashboard: ["Dashboard", "Your command center"],
   flight:    ["Flight", "Plan trips & watch abroad stock"],
+  rankwars:  ["Rank Wars", "Live ranked war tracker"],
   stats:     ["Stats", "Career & faction"],
   alerts:    ["Alerts", "Notifications & activity"],
   companion: ["Toolkit", "Notes, timers, targets & tools"],
@@ -1356,6 +1409,7 @@ function goto(page){
   if(page === "alerts"){ state.unread = 0; renderAlertBadge(); renderActivity(); }
   if(page === "flight"){ renderPlanner(); renderActiveFlight(); renderDestGrid(); renderYataStatus(); }
   if(page === "stats"){ renderStats(); }
+  if(page === "rankwars"){ rwEnter(); }
   if(page === "companion"){ renderCompanion(); }
   if(page === "settings"){ renderSettings(); }
   renderAll(); // cheap refresh of dynamic bits for the new page
@@ -1749,6 +1803,7 @@ function renderSettings(){
   document.querySelectorAll("[data-theme-val]").forEach(b => b.classList.toggle("active", b.dataset.theme_val === settings.theme || b.dataset.themeVal === settings.theme));
   $("setKey").value = settings.apiKey || "";
   $("setRefresh").value = String(settings.refresh);
+  $("setRwProxy").value = settings.rwProxy || "";
   $("tglEnergy").checked = !!settings.notifEnergy;
   $("tglFlight").checked = !!settings.notifFlight;
   $("tglCooldown").checked = !!settings.notifCooldown;
@@ -1826,6 +1881,271 @@ function renderAll(){
   renderMode();
 }
 
+/* ============================== RANK WARS ============================== */
+const rwState = { wars: [], detail: null, attackableOnly: true, timer: null, loading: false, myFaction: 0 };
+function rwIsLive(){ return state.mode === "live" && !!settings.apiKey && !!settings.rwProxy; }
+async function rwApi(pathname, params){
+  const q = new URLSearchParams({ path: pathname, key: (settings.apiKey || "").trim() });
+  for(const [k, v] of Object.entries(params || {})) if(v != null && v !== "") q.set(k, v);
+  let res;
+  try{ res = await fetch(settings.rwProxy + "/api/torn?" + q.toString(), { cache: "no-store" }); }
+  catch(e){ throw new Error("Can't reach the Rank Wars proxy"); }
+  let data;
+  try{ data = await res.json(); }catch(e){ throw new Error("Proxy returned HTTP " + res.status); }
+  if(data && data.error) throw new Error(data.error.error || "API error");
+  return data;
+}
+function rwNormalizeWar(w){
+  if(!w) return null;
+  const factions = (w.factions || []).map(f => ({ id: +f.id, name: f.name || "Unknown", score: +f.score || 0, chain: +f.chain || 0 }));
+  return { id: +(w.id || w.war_id) || 0, start: +w.start || 0, end: +w.end || 0,
+           target: +w.target || 0, winner: w.winner ? +w.winner : 0, factions };
+}
+function rwPhase(w){
+  const now = Date.now() / 1000;
+  if(w.winner) return "done";
+  if(now < w.start) return "scheduled";
+  return "ongoing";
+}
+/* ----- demo data (no proxy / demo mode) ----- */
+let rwDemo = null;
+function rwDemoData(){
+  const now = Math.floor(Date.now() / 1000);
+  const mkFac = (id, name, score, chain) => ({ id, name, score, chain });
+  const mkMember = (id, name, level, r) => {
+    const st = r < 0.45 ? { state:"Okay", description:"Okay", until:0, color:"green" }
+      : r < 0.85 ? { state:"Hospital", description:"In hospital", until: now + 90 + Math.floor((r * 9719) % 5400), color:"red" }
+      : r < 0.92 ? { state:"Jail", description:"In jail", until: now + 300 + Math.floor((r * 7919) % 3600), color:"red" }
+      : { state:"Traveling", description:"Traveling away", until:0, color:"blue" };
+    return { id, name, level, status: st, last_action: { timestamp: now - ((r * 6961) % 40000 | 0) } };
+  };
+  const roster = (base, tag) => Array.from({ length: 12 }, (_, i) =>
+    mkMember(base + i, tag + " Member " + (i + 1), 30 + ((i * 13) % 45), (i * 0.083 + base % 0.7) % 1));
+  if(!rwDemo){
+    rwDemo = {
+      wars: [
+        { id: 9121, start: now - 3600 * 3, end: now + 3600 * 4.2, target: 45000, winner: 0,
+          factions: [mkFac(33421, "Night Syndicate", 21230, 117), mkFac(28816, "Iron Vanguard", 18944, 64)] },
+        { id: 9118, start: now - 3600 * 8, end: now + 3600 * 1.1, target: 45000, winner: 0,
+          factions: [mkFac(19119, "Crimson Fleet", 38720, 250), mkFac(21567, "Northwind Pact", 9187, 0)] },
+        { id: 9130, start: now + 3600 * 20, end: now + 3600 * 44, target: 45000, winner: 0,
+          factions: [mkFac(33421, "Night Syndicate", 0, 0), mkFac(40411, "Obsidian Order", 0, 0)] }
+      ],
+      rosters: {
+        33421: roster(900, "NS"), 28816: roster(950, "IV"), 19119: roster(990, "CF"),
+        21567: roster(1030, "NP"), 40411: roster(1070, "OO")
+      },
+      chains: { 33421: { current: 117, max: 250, timer: 61 }, 28816: { current: 64, max: 250, timer: 12 },
+                19119: { current: 250, max: 250, timer: 0 }, 21567: { current: 0, max: 250, timer: 0 } }
+    };
+  }
+  return rwDemo;
+}
+function rwDemoApi(pathname, params){
+  const d = rwDemoData();
+  let m;
+  if(pathname === "/faction/warfareranked") return Promise.resolve({ warfareranked: d.wars });
+  if(pathname === "/faction/basic") return Promise.resolve({ basic: { id: 33421, name: "Night Syndicate", tag: "NS" } });
+  if((m = pathname.match(new RegExp("^\\/faction\\/(\\d+)\\/members$")))){
+    const id = +m[1];
+    return Promise.resolve({ members: d.rosters[id] || [] });
+  }
+  if((m = pathname.match(new RegExp("^\\/faction\\/(\\d+)\\/chain$")))){
+    const c = d.chains[+m[1]] || { current: 0, max: 250, timer: 0 };
+    return Promise.resolve({ chain: { current: c.current, max: c.max, timer: c.timer, modifier: 1.2, cooldown: 0 } });
+  }
+  return Promise.reject(new Error("Demo: unsupported " + pathname));
+}
+async function rwCall(pathname, params){
+  if(!rwIsLive()) return rwDemoApi(pathname, params);
+  return rwApi(pathname, params);
+}
+/* ----- rendering ----- */
+function rwStatusChip(txt, cls){ const el = $("rwStatus"); el.className = "chip " + (cls || ""); el.textContent = txt; }
+function rwEnter(){
+  $("rwSetup").hidden = !!settings.rwProxy || state.mode !== "live";
+  if(!rwIsLive()){
+    if(!settings.rwProxy && state.mode === "live") rwStatusChip("demo — no proxy configured", "warn");
+    else rwStatusChip("demo data", "warn");
+  }
+  rwLoad();
+  if(rwState.timer) clearInterval(rwState.timer);
+  rwState.timer = setInterval(() => { if(state.page === "rankwars") rwLoad(); }, 60000);
+}
+function rwMyFactionId(){
+  const pf = state.user && state.user.faction;
+  return (pf && pf.faction_id) || 0;
+}
+async function rwLoad(){
+  if(rwState.loading) return;
+  rwState.loading = true;
+  try{
+    if(rwIsLive()){
+      try{ const b = await rwApi("/faction/basic"); rwState.myFaction = (b && b.basic && b.basic.id) || rwMyFactionId(); }
+      catch(e){ rwState.myFaction = rwMyFactionId(); }
+      const data = await rwApi("/faction/warfareranked", { sort: "DESC", limit: 100 });
+      rwState.wars = (data.warfareranked || []).map(rwNormalizeWar).filter(Boolean);
+      rwStatusChip("🟢 live via proxy · " + timeAgo(Date.now()), "ok");
+    } else {
+      const data = await rwDemoApi("/faction/warfareranked");
+      rwState.wars = (data.warfareranked || []).map(rwNormalizeWar).filter(Boolean);
+      rwState.myFaction = 33421;
+    }
+    renderWars();
+    if(rwState.detail) renderWarDetail(rwState.detail);
+  }catch(e){
+    rwStatusChip("⚠️ " + e.message, "bad");
+    rwState.wars = [];
+    renderWars();
+  }
+  rwState.loading = false;
+}
+function renderWars(){
+  const box = $("rwWarsList");
+  if(!rwState.wars.length){
+    box.innerHTML = `<div class="empty">No ranked wars found${rwIsLive() ? "" : " — connect a proxy for live data"}.</div>`;
+    return;
+  }
+  const sorted = rwState.wars.slice().sort((a, b) => {
+    const pa = rwPhase(a) === "ongoing" ? 0 : rwPhase(a) === "scheduled" ? 1 : 2;
+    const pb = rwPhase(b) === "ongoing" ? 0 : rwPhase(b) === "scheduled" ? 1 : 2;
+    if(pa !== pb) return pa - pb;
+    return b.start - a.start;
+  });
+  box.innerHTML = sorted.map(w => {
+    const [A, B] = [w.factions[0], w.factions[1]] || [null, null];
+    const total = (A ? A.score : 0) + (B ? B.score : 0);
+    const pctA = total ? (A.score / total) * 100 : 50;
+    const phase = rwPhase(w);
+    const mine = rwState.myFaction && (A.id === rwState.myFaction || B.id === rwState.myFaction);
+    const phaseChip = phase === "ongoing" ? `<span class="chip ok">LIVE · ends in <span data-rwcd="${w.end}">${fmtDur(w.end - Date.now()/1000)}</span></span>`
+      : phase === "scheduled" ? `<span class="chip accent">starts in <span data-rwcd="${w.start}">${fmtDur(w.start - Date.now()/1000)}</span></span>`
+      : `<span class="chip">ended</span>`;
+    const targetPct = w.target ? Math.round((total / w.target) * 100) : 0;
+    return `<div class="card rw-war" data-rwwar="${w.id}">
+      <div class="rwtop">
+        ${phaseChip}
+        ${mine ? '<span class="chip accent">YOUR WAR</span>' : ""}
+        <span class="spacer"></span>
+        <span class="rwmeta"><span>war #${w.id}</span><span>target ${fmtInt(w.target)} (${targetPct}%)</span></span>
+      </div>
+      <div class="rwtop" style="margin-top:9px">
+        <span class="rw-facname">${escHtml(A.name)}</span>
+        <span class="rwscore">${fmtInt(A.score)}</span>
+        <span class="rwvs">vs</span>
+        <span class="rwscore">${fmtInt(B.score)}</span>
+        <span class="rw-facname">${escHtml(B.name)}</span>
+      </div>
+      <div class="dom"><div class="a" style="width:${pctA.toFixed(1)}%"></div><div class="b" style="flex:1"></div></div>
+      <div class="rwmeta">
+        <span>🔗 chains ${A.chain} / ${B.chain}</span>
+        <span style="margin-left:auto">${phase === "done" ? "click for report" : "click for war room"}</span>
+      </div>
+    </div>`;
+  }).join("");
+  box.querySelectorAll("[data-rwwar]").forEach(el =>
+    el.addEventListener("click", () => rwOpenWar(+el.dataset.rwwar)));
+}
+async function rwOpenWar(id){
+  const w = rwState.wars.find(x => x.id === id);
+  if(!w) return;
+  rwState.detail = id;
+  renderWarDetail(id, true);
+  for(const f of w.factions){
+    try{
+      const mem = await rwCall(`/faction/${f.id}/members`, { striptags: "true" });
+      f._members = (mem && (mem.members || mem)) || [];
+    }catch(e){ f._members = null; }
+    try{
+      const ch = await rwCall(`/faction/${f.id}/chain`);
+      f._chain = (ch && ch.chain) || null;
+    }catch(e){ f._chain = null; }
+  }
+  renderWarDetail(id);
+}
+function rwStatusCell(m){
+  const s = (m && m.status) || {};
+  const nowS = Date.now() / 1000;
+  if(s.state === "Hospital" && s.until > nowS) return `<span class="hosp">🏥 <span data-rwhosp="${s.until}">${fmtDur(s.until - nowS)}</span></span>`;
+  if(s.state === "Jail" && s.until > nowS) return `<span class="jail">🚔 <span data-rwhosp="${s.until}">${fmtDur(s.until - nowS)}</span></span>`;
+  if(s.state === "Traveling" || s.state === "Abroad") return `<span class="away">✈️ ${escHtml(s.state)}</span>`;
+  if(s.state === "Okay") return `<span class="okay">OK</span>`;
+  return `<span style="color:var(--muted)">${escHtml(s.state || s.description || "—")}</span>`;
+}
+function renderWarDetail(id, loadingOnly){
+  const w = rwState.wars.find(x => x.id === id);
+  const box = $("rwDetail");
+  if(!w){ rwState.detail = null; box.innerHTML = ""; return; }
+  const [A, B] = [w.factions[0], w.factions[1]] || [null, null];
+  const phase = rwPhase(w);
+  const lead = A.score - B.score;
+  const total = A.score + B.score;
+  const targetPct = w.target ? Math.min(100, Math.round((total / w.target) * 100)) : 0;
+  const left = phase === "ongoing" ? fmtDur(w.end - Date.now()/1000) : phase === "scheduled" ? "starts in " + fmtDur(w.start - Date.now()/1000) : "ended";
+  const chainHtml = f => {
+    const c = f._chain;
+    if(!c) return "";
+    const cur = +c.current || 0, max = +c.max || 250, t = +c.timer || 0;
+    return `<div class="chainbar"><span>🔗 ${cur}/${max}</span>
+      <div class="track"><div class="fill chainfill" style="width:${Math.min(100, cur/max*100)}%"></div></div>
+      <span class="${t > 0 && t <= 60 ? "hosp" : ""}">${t > 0 ? t + "s" : "—"}</span></div>`;
+  };
+  const rosterTable = f => {
+    let mems = f._members;
+    if(mems == null) return `<div class="empty" style="padding:16px">${loadingOnly ? "Loading roster…" : "Roster unavailable"}</div>`;
+    mems = mems.slice().sort((a, b) => ((a.status && a.status.state === "Okay") ? 0 : 1) - ((b.status && b.status.state === "Okay") ? 0 : 1));
+    if(rwState.attackableOnly){
+      const nowS = Date.now() / 1000;
+      mems = mems.filter(m => (m.status && m.status.state === "Okay") ||
+        (m.status && m.status.state === "Hospital" && m.status.until && m.status.until - nowS <= 600));
+    }
+    const rows = mems.slice(0, 30).map(m => `
+      <tr>
+        <td><a href="https://www.torn.com/profiles.php?XID=${m.id}" target="_blank" rel="noopener" style="font-weight:700">${escHtml(m.name)}</a></td>
+        <td class="r">${fmtInt(m.level)}</td>
+        <td>${rwStatusCell(m)}</td>
+        <td class="r" style="color:var(--faint)">${m.last_action && m.last_action.timestamp ? timeAgo(m.last_action.timestamp * 1000) : "—"}</td>
+        <td class="r"><a class="btn sm" href="https://www.torn.com/loader.php?sid=attack&user2ID=${m.id}" target="_blank" rel="noopener">⚔</a></td>
+      </tr>`).join("");
+    return `<div class="card tblwrap rw-roster"><table class="tbl">
+      <thead><tr><th>${escHtml(f.name)} <span class="chip" style="font-size:9.5px;padding:1px 5px">${mems.length} attackable</span></th>
+      <th class="r">Lvl</th><th>Status</th><th class="r">Last act</th><th></th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="5" style="color:var(--faint)">none right now</td></tr>'}</tbody></table></div>`;
+  };
+  box.innerHTML = `
+    <h2 class="sec">War Room <span class="chip accent" style="text-transform:none">war #${w.id} · ${left}</span>
+      <span class="spacer"></span>
+      <label style="font-size:12px;color:var(--muted);display:inline-flex;gap:6px;align-items:center;cursor:pointer">
+        <input type="checkbox" id="rwAtkOnly" ${rwState.attackableOnly ? "checked" : ""} style="accent-color:var(--accent)"> attackable only
+      </label>
+      <button class="btn sm" id="rwClose" style="margin-left:8px">✕ close</button>
+    </h2>
+    <div class="card" style="padding:15px;display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+      <div><div class="rw-facname">${escHtml(A.name)}</div><div class="rw-score-big">${fmtInt(A.score)}</div>${chainHtml(A)}</div>
+      <div style="text-align:center;min-width:120px">
+        <div style="font-size:11px;color:var(--faint);letter-spacing:.8px">TARGET ${targetPct}%</div>
+        <div class="dom" style="margin:6px 0"><div class="a" style="width:${total ? (A.score/total*100).toFixed(1) : 50}%"></div><div class="b" style="flex:1"></div></div>
+        <b class="num" style="font-size:15px">${lead === 0 ? "TIED" : (lead > 0 ? escHtml(A.name) : escHtml(B.name))} +${fmtInt(Math.abs(lead))}</b>
+        <div style="font-size:11px;color:var(--faint)" class="num" data-rwcd="${w.end}">${left}</div>
+      </div>
+      <div style="margin-left:auto;text-align:right"><div class="rw-facname">${escHtml(B.name)}</div><div class="rw-score-big">${fmtInt(B.score)}</div>${chainHtml(B)}</div>
+    </div>
+    <div class="grid g2" style="margin-top:12px">${rosterTable(A)}${rosterTable(B)}</div>`;
+  $("rwClose").addEventListener("click", () => { rwState.detail = null; box.innerHTML = ""; });
+  $("rwAtkOnly").addEventListener("change", e => { rwState.attackableOnly = e.target.checked; renderWarDetail(id); });
+}
+function rwTick(){
+  if(state.page !== "rankwars") return;
+  const nowS = Date.now() / 1000;
+  document.querySelectorAll("[data-rwcd]").forEach(el => {
+    const t = +el.dataset.rwcd - nowS;
+    el.textContent = t > 0 ? fmtDur(t) : "now";
+  });
+  document.querySelectorAll("[data-rwhosp]").forEach(el => {
+    const t = +el.dataset.rwhosp - nowS;
+    el.textContent = t > 0 ? fmtDur(t) : "out";
+  });
+}
 /* ============================== COMPANION ============================== */
 let compNotes = store.get("lc2_notes", "");
 let compTimers = store.get("lc2_timers", []);     // {id, label, ends, notified}
@@ -2046,7 +2366,7 @@ let palSel = 0, palItems = [];
 function palSources(){
   const out = [];
   for(const p of Object.keys(PAGES)) out.push({ icon: PAGES[p] ? "" : "", title: "Go to " + PAGES[p][0], sub: PAGES[p][1], key: "page", run: () => goto(p) });
-  const pIcons = { dashboard:"⚡", flight:"✈️", stats:"📈", alerts:"🔔", companion:"🧭", settings:"⚙️" };
+  const pIcons = { dashboard:"⚡", flight:"✈️", rankwars:"⚔️", stats:"📈", alerts:"🔔", companion:"🧭", settings:"⚙️" };
   for(const o of out) o.icon = pIcons[o.title.replace("Go to ", "").toLowerCase()] || "➜";
   for(const d of DESTINATIONS) out.push({ icon: flagEmoji(d.flag), title: "Fly to " + d.country, sub: d.city + " · fastest " + fmtDur(Math.min(...Object.values(d.times)) * 60), key: "flight", run: () => { goto("flight"); $("planDest").value = d.country; renderPlanInfo(); } });
   for(const a of actionsList()) out.push({ icon: a.icon || "🔗", title: "Open " + a.name, sub: "torn.com", key: "link", run: () => window.open(a.url, "_blank") });
@@ -2193,6 +2513,12 @@ function wire(){
   $("setRefresh").addEventListener("change", e => {
     settings.refresh = Number(e.target.value); saveSettings(); scheduleLive();
   });
+  const saveRwProxy = () => {
+    settings.rwProxy = ($("setRwProxy").value || "").trim().replace(/\/$/, "");
+    saveSettings(); toast(settings.rwProxy ? "Rank Wars proxy saved" : "Rank Wars proxy cleared", "ok");
+  };
+  $("btnSetRwProxy").addEventListener("click", saveRwProxy);
+  $("setRwProxy").addEventListener("keydown", e => { if(e.key === "Enter") saveRwProxy(); });
   document.querySelectorAll("[data-theme-val]").forEach(b =>
     b.addEventListener("click", () => {
       settings.theme = b.dataset.themeVal; saveSettings(); applyAppearance(); renderSettings();
@@ -2248,6 +2574,16 @@ function wire(){
     b.addEventListener("click", () => addCompTimer("", Number(b.dataset.quickmin))));
   $("btnTrackAdd").addEventListener("click", addCompTracker);
   $("trackId").addEventListener("keydown", e => { if(e.key === "Enter") addCompTracker(); });
+
+  // rank wars
+  $("btnRwRefresh").addEventListener("click", () => rwLoad());
+  $("btnRwProxy").addEventListener("click", () => {
+    settings.rwProxy = ($("rwProxyInput").value || "").trim().replace(/\/$/, "");
+    saveSettings(); $("setRwProxy").value = settings.rwProxy;
+    $("rwSetup").hidden = !!settings.rwProxy && state.mode === "live";
+    rwLoad();
+    toast(settings.rwProxy ? "⚔️ Proxy set — loading live wars" : "Proxy URL required", settings.rwProxy ? "ok" : "warn");
+  });
 }
 /* Blank skeleton used when entering live mode — guarantees no demo numbers
    linger anywhere (Stats especially). */
@@ -2333,7 +2669,7 @@ function init(){
   }
   else scheduleLive();
   fetchYata(false);
-  setInterval(() => { simTick(1); updateDynamic(); checkAlerts(); tickCompanion(); }, 1000);
+  setInterval(() => { simTick(1); updateDynamic(); checkAlerts(); tickCompanion(); rwTick(); }, 1000);
   // periodic stock feed re-poll (every 3 min)
   setInterval(() => fetchYata(false), 3 * 60 * 1000);
   if("serviceWorker" in navigator && location.protocol.startsWith("http")){
