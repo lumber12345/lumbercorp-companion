@@ -39,6 +39,46 @@ const PATH_OK = [
 ];
 const PARAM_OK = new Set(['sort', 'from', 'to', 'limit', 'offset', 'cat', 'striptags', 'timestamp', 'filters']);
 
+/* ------------------------------------------------------------ ff scouter */
+/* Proxy for ffscouter.com official API (v1) — copied from the rankwars app's
+ * server so the embedded Live Wars tab keeps its FF Scouter feature.
+ *   stats    GET /api/v1/get-stats?key&targets   (<=205 ids/call, 20/min/IP)
+ *   check    GET /api/v1/check-key?key           (10/min/IP)
+ *   register POST /api/v1/register               (3/min/IP, JSON body)
+ * Env: FF_BASE/FF_PORT/FF_PROTOCOL (test overrides). */
+const FF_BASE = process.env.FF_BASE || 'ffscouter.com';
+const FF_PORT = Number(process.env.FF_PORT) || 443;
+const FF_PROTOCOL = process.env.FF_PROTOCOL || 'https'; /* http only for tests */
+function fetchFF(pathname, { method = 'GET', body = null, params = {} }) {
+  return new Promise((resolve, reject) => {
+    const qs = new URLSearchParams(params);
+    const options = {
+      hostname: FF_BASE.split(':')[0],
+      port: FF_BASE.includes(':') ? Number(FF_BASE.split(':')[1]) : FF_PORT,
+      path: `${pathname}${qs.toString() ? '?' + qs.toString() : ''}`,
+      method,
+      headers: { accept: 'application/json', 'user-agent': 'LumberCorp2Proxy/1.0 (unofficial fan tool)' },
+      timeout: 15000,
+    };
+    let payload = null;
+    if (body) {
+      payload = JSON.stringify(body);
+      options.headers['content-type'] = 'application/json';
+      options.headers['content-length'] = Buffer.byteLength(payload);
+    }
+    const req = (FF_PROTOCOL === 'http' ? http : https).request(options, (res) => {
+      const chunks = [];
+      let size = 0;
+      res.on('data', (c) => { size += c.length; if (size > 2 * 1024 * 1024) req.destroy(); else chunks.push(c); });
+      res.on('end', () => resolve({ status: res.statusCode, body: Buffer.concat(chunks).toString('utf8') }));
+    });
+    req.on('timeout', () => req.destroy(new Error('FF Scouter timeout')));
+    req.on('error', reject);
+    if (payload) req.write(payload);
+    req.end();
+  });
+}
+
 /* ---------------------------------------------------------------- send */
 function send(res, status, obj, extra) {
   const body = JSON.stringify(obj);
@@ -48,6 +88,14 @@ function send(res, status, obj, extra) {
     'cache-control': 'no-store',
   }, extra || {}));
   res.end(body);
+}
+function sendRaw(res, status, text, extra) {
+  res.writeHead(status, Object.assign({
+    'content-type': 'application/json; charset=utf-8',
+    'access-control-allow-origin': '*',
+    'cache-control': 'no-store',
+  }, extra || {}));
+  res.end(text);
 }
 
 /* ------------------------------------------------------------ torn call */
@@ -93,6 +141,46 @@ const server = http.createServer((req, res) => {
     return res.end();
   }
   if (u.pathname === '/api/ping') return send(res, 200, { ok: true, ts: Date.now() });
+
+  if (u.pathname === '/api/ffscouter') {
+    const key = u.searchParams.get('key') || '';
+    const mode = u.searchParams.get('mode') || '';
+    if (!key) return send(res, 400, { error: { error: 'Missing API key' } });
+    if (!['stats', 'check', 'register'].includes(mode)) return send(res, 400, { error: { error: 'Unknown FF Scouter mode: ' + mode } });
+    const mask = (s) => (s || '').split(key).join('***');
+    const finish = (status, body) => sendRaw(res, status, key && body.includes(key) ? mask(body) : body);
+
+    if (mode === 'stats') {
+      const idsRaw = (u.searchParams.get('ids') || '').trim();
+      if (!idsRaw) return send(res, 400, { error: { error: 'The targets parameter is required' } });
+      const ids = idsRaw.split(',').map((x) => x.trim()).filter(Boolean);
+      if (!ids.length || ids.length > 205) return send(res, 400, { error: { error: 'Between 1 and 205 target IDs required' } });
+      if (!ids.every((x) => /^\d+$/.test(x))) return send(res, 400, { error: { error: 'All target IDs must be positive integers' } });
+      const ck = 'ff:stats:' + ids.slice().sort((a, b) => a - b).join(',');
+      const hit = cacheGet(ck);
+      if (hit && u.searchParams.get('nocache') !== '1') return sendRaw(res, hit.status, key && hit.body.includes(key) ? mask(hit.body) : hit.body, { 'x-ff-cache': 'HIT' });
+      fetchFF('/api/v1/get-stats', { params: { key, targets: ids.join(',') } })
+        .then(({ status, body }) => { if (status >= 200 && status < 300) cacheSet(ck, status, body); finish(status, body); })
+        .catch((e) => send(res, 504, { error: { error: 'FF Scouter request failed: ' + (e.message || 'unknown') } }));
+      return;
+    }
+
+    if (mode === 'check') {
+      const ck = 'ff:check:' + Buffer.from(key).toString('base64');
+      const hit = cacheGet(ck);
+      if (hit) return sendRaw(res, hit.status, key && hit.body.includes(key) ? mask(hit.body) : hit.body, { 'x-ff-cache': 'HIT' });
+      fetchFF('/api/v1/check-key', { params: { key } })
+        .then(({ status, body }) => { if (status >= 200 && status < 300) cacheSet(ck, status, body); finish(status, body); })
+        .catch((e) => send(res, 504, { error: { error: 'FF Scouter request failed: ' + (e.message || 'unknown') } }));
+      return;
+    }
+
+    // mode === 'register'
+    fetchFF('/api/v1/register', { method: 'POST', body: { key, agree_to_data_policy: true, signup_source: 'LumberCorp2' } })
+      .then(({ status, body }) => finish(status, body))
+      .catch((e) => send(res, 504, { error: { error: 'FF Scouter request failed: ' + (e.message || 'unknown') } }));
+    return;
+  }
 
   if (u.pathname === '/api/torn') {
     const path = u.searchParams.get('path') || '';

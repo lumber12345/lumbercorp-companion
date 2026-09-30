@@ -1,14 +1,17 @@
 /* LumberCorp 2.0 service worker — offline fallback + installability.
    Strategy: NETWORK-FIRST for same-origin GETs. The cache exists only so the
    app opens offline; when online you always get the newest build on reload. */
-const CACHE = "lumbercorp2-shell-v20";
+const CACHE = "lumbercorp2-shell-v21";
 const ASSETS = [
   "./",
   "./index.html",
   "./manifest.webmanifest",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
-  "./icons/icon-maskable-512.png"
+  "./icons/icon-maskable-512.png",
+  "./rankwars/index.html",
+  "./rankwars/app.js",
+  "./rankwars/styles.css"
 ];
 
 self.addEventListener("install", (e) => {
