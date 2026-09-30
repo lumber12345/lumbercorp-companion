@@ -794,7 +794,7 @@ function flagEmoji(cc){
 }
 
 /* ---------- settings ---------- */
-const APP_VERSION = "2.22.0";
+const APP_VERSION = "2.23.0";
 const DEFAULT_SETTINGS = {
   mode: "demo", apiKey: "", refresh: 60,
   theme: "dark", accent: "amber",
@@ -1851,6 +1851,13 @@ function rwStatusCard(html){
   if(html == null){ c.hidden = true; c.innerHTML = ""; return; }
   c.hidden = false;
   c.innerHTML = html;
+  const s2 = $("btnRwProxy2");
+  if(s2) s2.addEventListener("click", () => {
+    settings.rwProxy = ($("rwProxyInput2").value || "").trim().replace(/\/$/, "");
+    saveSettings();
+    toast(settings.rwProxy ? "⚔️ Proxy set — built-in app connecting" : "Proxy URL required", settings.rwProxy ? "ok" : "warn");
+    rwFrameOn();
+  });
   const r = $("btnRwRetry");
   if(r) r.addEventListener("click", () => { rwState.tries = 0; rwFrameOn(); });
   const b = $("btnRwLocal");
@@ -1889,9 +1896,22 @@ async function rwWake(){
   }
   rwState.tries++;
   const waking = rwState.tries <= 12;   /* ~60 s of 5 s auto-retries */
-  rwStatusCard(`<div class="setrow"><div><div class="st">${waking ? "⏳ Waking rankwars.onrender.com…" : "🔴 rankwars.onrender.com is unreachable"}</div>
-  <div class="sd">${waking ? "Free Render instances sleep after 15 minutes idle — the first load can take up to a minute. Retrying automatically…" : "Check that the deployment is running on Render, or use the built-in Rank Wars app with your own proxy instead."}</div></div>
-  <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" id="btnRwRetry">⟳ Retry</button>${waking ? "" : '<button class="btn sm primary" id="btnRwLocal">Use built-in app</button>'}</div></div>`);
+  if(waking){
+    rwStatusCard(`<div class="setrow"><div><div class="st">⏳ Waking rankwars.onrender.com…</div>
+    <div class="sd">Free Render instances sleep after 15 minutes idle — the first load can take up to a minute. Retrying automatically…</div></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" id="btnRwRetry">⟳ Retry now</button></div></div>`);
+  } else {
+    rwStatusCard(`<div class="setrow"><div><div class="st">🔴 rankwars.onrender.com is unreachable</div>
+    <div class="sd">Free instances sleep when idle — but if it stays down, your Render <b>free instance hours</b> may have run out this month (check the Render dashboard) or the service was suspended. Meanwhile: paste any working LumberCorp proxy URL below and the built-in Rank Wars app will run through it.</div></div></div>
+    <div class="setrow">
+      <input type="text" id="rwProxyInput2" placeholder="https://your-proxy.onrender.com" style="flex:1;min-width:220px;background:var(--card2);border:1px solid var(--border2);border-radius:10px;padding:9px 11px;font-weight:600">
+      <button class="btn sm primary" id="btnRwProxy2">Save &amp; load</button>
+    </div>
+    <div class="setrow" style="gap:8px;flex-wrap:wrap">
+      <button class="btn sm" id="btnRwRetry">⟳ Retry deployment</button>
+      <button class="btn sm" id="btnRwLocal">Use built-in app</button>
+    </div>`);
+  }
   if(waking){
     if(rwState.timer) clearTimeout(rwState.timer);
     rwState.timer = setTimeout(() => { if(state.page === "rankwars") rwWake(); }, 5000);
