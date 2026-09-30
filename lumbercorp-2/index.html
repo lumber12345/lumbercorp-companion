@@ -109,7 +109,7 @@
     backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
     border-top:1px solid var(--border);
     padding:6px 8px calc(6px + env(safe-area-inset-bottom));
-    grid-template-columns:repeat(7,1fr);gap:2px;
+    grid-template-columns:repeat(6,1fr);gap:2px;
   }
   .tabbar button{
     background:none;border:none;color:var(--faint);cursor:pointer;
@@ -284,30 +284,10 @@
   .dest .itemchip b{color:var(--text)}
   .dest .itemchip .zero{opacity:.45}
 
-  /* ================= market ================= */
-  .mktbar{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
-  .mktbar input[type=search]{
-    flex:1;min-width:180px;background:var(--card);border:1px solid var(--border2);border-radius:11px;
-    padding:10px 13px;font-size:13.5px;outline:none;
-  }
-  .mktbar input[type=search]:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--glow)}
-  .mktbar select{background:var(--card);border:1px solid var(--border2);border-radius:11px;padding:9px 10px;font-size:13px;font-weight:600;outline:none}
+  /* ================= shared controls ================= */
   .seg{display:inline-flex;background:var(--card);border:1px solid var(--border2);border-radius:11px;padding:3px;gap:3px}
   .seg button{border:none;background:none;color:var(--muted);font-size:12.5px;font-weight:700;padding:7px 13px;border-radius:8px;cursor:pointer;transition:.15s}
   .seg button.active{background:var(--card3);color:var(--text);box-shadow:inset 0 0 0 1px var(--border2)}
-  .ilist{display:flex;flex-direction:column;gap:7px}
-  .irow{display:flex;align-items:center;gap:12px;padding:10px 13px;background:var(--card);border:1px solid var(--border);border-radius:12px}
-  .irow .ii{font-size:19px;width:26px;text-align:center;flex:0 0 auto}
-  .irow .im{min-width:0;flex:1}
-  .irow .in{font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .irow .it{font-size:11px;color:var(--faint)}
-  .irow .ip{text-align:right;font-size:13px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
-  .irow .ip small{display:block;font-size:10.5px;color:var(--faint);font-weight:600}
-  .irow .spread{font-size:11px;font-weight:800;border-radius:7px;padding:2px 7px;background:var(--card2);border:1px solid var(--border);color:var(--muted);white-space:nowrap}
-  .irow .spread.up{color:var(--ok)}
-  .irow .spread.down{color:var(--bad)}
-  .star{background:none;border:none;cursor:pointer;font-size:16px;color:var(--faint);padding:2px}
-  .star.on{color:var(--warn)}
   .tbl{width:100%;border-collapse:collapse;font-size:12.5px}
   .tbl th{font-size:10.5px;text-transform:uppercase;letter-spacing:.8px;color:var(--faint);text-align:left;padding:8px 10px;border-bottom:1px solid var(--border)}
   .tbl td{padding:9px 10px;border-bottom:1px solid var(--border);font-variant-numeric:tabular-nums}
@@ -434,7 +414,6 @@
     </div>
     <button class="navitem active" data-page="dashboard"><span class="ni">⚡</span> Dashboard</button>
     <button class="navitem" data-page="flight"><span class="ni">✈️</span> Flight</button>
-    <button class="navitem" data-page="market"><span class="ni">💱</span> Market</button>
     <button class="navitem" data-page="stats"><span class="ni">📈</span> Stats</button>
     <button class="navitem" data-page="alerts"><span class="ni">🔔</span> Alerts <span class="badge" id="alertBadge" hidden>0</span></button>
     <button class="navitem" data-page="companion"><span class="ni">🧭</span> Companion</button>
@@ -540,35 +519,6 @@
         <button class="btn sm" id="btnReport">📣 Report stock</button>
       </div>
       <div class="destgrid" id="destGrid" style="margin-top:12px"></div>
-    </section>
-
-    <!-- ============ MARKET ============ -->
-    <section id="page-market" hidden>
-      <div class="mktbar">
-        <input type="search" id="mktSearch" placeholder="Search items… ( / to focus )">
-        <select id="mktType">
-          <option value="">All types</option>
-          <option>Drug</option><option>Medical</option><option>Armor</option>
-          <option>Weapon</option><option>Other</option><option>Plane</option><option>Car</option>
-        </select>
-        <select id="mktSort">
-          <option value="name">Name</option>
-          <option value="value">Market value ↓</option>
-          <option value="spread">Best flip ↑</option>
-        </select>
-        <div class="seg">
-          <button class="active" data-mkt="db">Item DB</button>
-          <button data-mkt="abroad">Abroad profit</button>
-        </div>
-      </div>
-      <div class="ilist" id="mktList"></div>
-      <div id="abroadWrap" hidden>
-        <div class="field" style="max-width:280px;margin-bottom:12px">
-          <label>Country</label>
-          <select id="abroadCountry"></select>
-        </div>
-        <div class="card tblwrap"><table class="tbl" id="abroadTable"></table></div>
-      </div>
     </section>
 
     <!-- ============ STATS ============ -->
@@ -733,7 +683,7 @@
         <div><b style="color:var(--text)">LumberCorp 2.0</b> <span class="chip accent" id="aboutVer">v2.0.0</span></div>
         <div>
           What's new over 1.0: live bar ETAs &amp; tick simulation · flight planner with landing countdown + notifications ·
-          restock-cycle ticker · abroad <i>profit</i> table vs market value · ⌘K command palette · watchlists ·
+          restock-cycle ticker · abroad <i>profit</i> tables vs market value · ⌘K command palette ·
           themable accents · export/reset. Abroad stock still comes from
           <a href="https://yata.yt" target="_blank" rel="noopener">YATA</a> with last-good caching (stale-while-revalidate),
           plus an optional aggregator backend (<code>AGGREGATOR_URL</code>).
@@ -747,7 +697,6 @@
 <nav class="tabbar" id="tabbar">
   <button class="active" data-page="dashboard"><span class="ti">⚡</span>Home</button>
   <button data-page="flight"><span class="ti">✈️</span>Flight</button>
-  <button data-page="market"><span class="ti">💱</span>Market</button>
   <button data-page="stats"><span class="ti">📈</span>Stats</button>
   <button data-page="alerts"><span class="ti">🔔</span>Alerts<span class="badge" id="alertBadgeM" hidden>0</span></button>
   <button data-page="companion"><span class="ti">🧭</span>Tools</button>
@@ -841,7 +790,7 @@ function flagEmoji(cc){
 }
 
 /* ---------- settings ---------- */
-const APP_VERSION = "2.0.8";
+const APP_VERSION = "2.0.9";
 const DEFAULT_SETTINGS = {
   mode: "demo", apiKey: "", refresh: 60,
   theme: "dark", accent: "amber",
@@ -1054,9 +1003,7 @@ const state = {
   prevCds: null,
   activity: store.get("lc2_activity", []),
   unread: 0,
-  mktView: "db",
-  flight: store.get("lc2_flight", null),  // {dest, cls, depart, arrive, cost}
-  watchlist: store.get("lc2_watchlist", [])
+  flight: store.get("lc2_flight", null)  // {dest, cls, depart, arrive, cost}
 };
 
 /* ---------- activity log & toasts ---------- */
@@ -1279,7 +1226,6 @@ async function fetchYata(force){
   $("btnYata").classList.remove("spin");
   renderYataStatus();
   if(state.page === "flight") renderDestGrid();
-  if(state.mktView === "abroad" && state.page === "market") renderAbroad();
 }
 function yataFor(country){
   if(!yataData || !yataData.stocks) return null;
@@ -1373,7 +1319,6 @@ function restockInfo(){
 const PAGES = {
   dashboard: ["Dashboard", "Your command center"],
   flight:    ["Flight", "Plan trips & watch abroad stock"],
-  market:    ["Market", "Item DB & abroad profit"],
   stats:     ["Stats", "Career & faction"],
   alerts:    ["Alerts", "Notifications & activity"],
   companion: ["Companion", "Notes, timers, targets & tools"],
@@ -1390,7 +1335,6 @@ function goto(page){
   $("pageSub").textContent = PAGES[page][1];
   if(page === "alerts"){ state.unread = 0; renderAlertBadge(); renderActivity(); }
   if(page === "flight"){ renderPlanner(); renderActiveFlight(); renderDestGrid(); renderYataStatus(); }
-  if(page === "market"){ renderMarket(); renderAbroad(); }
   if(page === "stats"){ renderStats(); }
   if(page === "companion"){ renderCompanion(); }
   if(page === "settings"){ renderSettings(); }
@@ -1692,78 +1636,6 @@ function openStockSheet(country){
 }
 
 /* ---------- market ---------- */
-function renderMarket(){
-  const q = ($("mktSearch").value || "").toLowerCase();
-  const type = $("mktType").value;
-  const sort = $("mktSort").value;
-  let list = (state.itemCache || state.items).slice();
-  if(q) list = list.filter(i => i.name.toLowerCase().includes(q));
-  if(type) list = list.filter(i => i.type === type);
-  if(sort === "value") list.sort((a, b) => (b.market_value || 0) - (a.market_value || 0));
-  else if(sort === "spread"){
-    list.sort((a, b) => flipPct(b) - flipPct(a));
-  } else list.sort((a, b) => a.name.localeCompare(b.name));
-  const CAP = 300;
-  const total = list.length;
-  list = list.slice(0, CAP);
-  $("mktList").innerHTML = list.map(i => {
-    const wl = state.watchlist.includes(i.id);
-    const sp = flipPct(i);
-    return `<div class="irow">
-      <button class="star ${wl ? "on" : ""}" data-star="${i.id}" title="Watchlist">${wl ? "★" : "☆"}</button>
-      <span class="ii">${i.icon || "📦"}</span>
-      <div class="im"><div class="in">${escHtml(i.name)}</div><div class="it">${escHtml(i.type)} · #${i.id}</div></div>
-      <span class="spread ${sp >= 0 ? "up" : "down"}">${sp >= 0 ? "+" : ""}${sp.toFixed(1)}% flip</span>
-      <div class="ip">${fmtMoney(i.market_value)}<small>buy ${fmtMoney(i.buy_price)} · sell ${fmtMoney(i.sell_price)}</small></div>
-    </div>`;
-  }).join("") + (total > CAP ? `<div class="empty">Showing ${CAP} of ${fmtInt(total)} items — search to narrow.</div>` : "");
-  if(!list.length) $("mktList").innerHTML = `<div class="empty">No items match.</div>`;
-  $("mktList").querySelectorAll("[data-star]").forEach(b => {
-    b.addEventListener("click", () => {
-      const id = Number(b.dataset.star);
-      const idx = state.watchlist.indexOf(id);
-      if(idx >= 0) state.watchlist.splice(idx, 1); else state.watchlist.push(id);
-      store.set("lc2_watchlist", state.watchlist);
-      renderMarket();
-    });
-  });
-}
-function flipPct(i){
-  if(!i.buy_price || !i.market_value) return -100;
-  return ((i.sell_price || i.market_value) - i.buy_price) / i.buy_price * 100;
-}
-function renderAbroad(){
-  const sel = $("abroadCountry");
-  if(!sel.options.length){
-    sel.innerHTML = DESTINATIONS.map(d =>
-      `<option value="${escHtml(d.country)}">${flagEmoji(d.flag)} ${escHtml(d.country)}</option>`).join("");
-  }
-  const country = sel.value || DESTINATIONS[0].country;
-  const d = DESTINATIONS.find(x => x.country === country);
-  const y = yataFor(country);
-  let rows = countryItems(d).map(it => {
-    const feed = yataStockFor(country, it.n);
-    const qty = feed ? feed.quantity : null;
-    const cost = (feed && feed.cost) ? feed.cost : it.price;
-    const mkt = itemMarketValue(it.n);
-    return { it, qty, cost, mkt, profit: mkt != null ? mkt - cost : null,
-             total: (mkt != null && qty) ? (mkt - cost) * qty : null };
-  });
-  rows.sort((a, b) => (b.profit ?? -1e12) - (a.profit ?? -1e12));
-  $("abroadTable").innerHTML = `
-    <thead><tr><th>Item</th><th class="r">Qty</th><th class="r">Shop</th><th class="r">Market</th><th class="r">Profit/u</th><th class="r">Total if cleared</th></tr></thead>
-    <tbody>${rows.map(r => `
-      <tr style="${r.qty === 0 ? "opacity:.45" : ""}">
-        <td style="font-weight:700">${escHtml(r.it.n)}</td>
-        <td class="r">${r.qty == null ? "—" : fmtInt(r.qty)}</td>
-        <td class="r">${fmtMoney(r.cost)}</td>
-        <td class="r">${r.mkt != null ? fmtMoney(r.mkt) : "—"}</td>
-        <td class="r">${r.profit != null ? `<span class="${r.profit >= 0 ? "profit-up" : "profit-down"}">${r.profit >= 0 ? "+" : ""}${fmtMoney(r.profit)}</span>` : "—"}</td>
-        <td class="r">${r.total != null ? fmtMoney(r.total) : "—"}</td>
-      </tr>`).join("")}
-    </tbody>`;
-}
-
 /* ---------- stats ---------- */
 function renderStats(){
   const f = state.faction;
@@ -1930,7 +1802,6 @@ function renderMode(){
 function renderAll(){
   renderDashboard();
   if(state.page === "flight"){ renderActiveFlight(); renderDestGrid(); renderYataStatus(); }
-  if(state.page === "market"){ renderMarket(); renderAbroad(); }
   if(state.page === "stats") renderStats();
   renderMode();
 }
@@ -2155,10 +2026,9 @@ let palSel = 0, palItems = [];
 function palSources(){
   const out = [];
   for(const p of Object.keys(PAGES)) out.push({ icon: PAGES[p] ? "" : "", title: "Go to " + PAGES[p][0], sub: PAGES[p][1], key: "page", run: () => goto(p) });
-  const pIcons = { dashboard:"⚡", flight:"✈️", market:"💱", stats:"📈", alerts:"🔔", companion:"🧭", settings:"⚙️" };
+  const pIcons = { dashboard:"⚡", flight:"✈️", stats:"📈", alerts:"🔔", companion:"🧭", settings:"⚙️" };
   for(const o of out) o.icon = pIcons[o.title.replace("Go to ", "").toLowerCase()] || "➜";
   for(const d of DESTINATIONS) out.push({ icon: flagEmoji(d.flag), title: "Fly to " + d.country, sub: d.city + " · fastest " + fmtDur(Math.min(...Object.values(d.times)) * 60), key: "flight", run: () => { goto("flight"); $("planDest").value = d.country; renderPlanInfo(); } });
-  for(const i of (state.itemCache || state.items).slice(0, 40)) out.push({ icon: i.icon || "📦", title: i.name, sub: i.type + " · " + fmtMoney(i.market_value), key: "market", run: () => { goto("market"); $("mktSearch").value = i.name; renderMarket(); } });
   for(const a of actionsList()) out.push({ icon: a.icon || "🔗", title: "Open " + a.name, sub: "torn.com", key: "link", run: () => window.open(a.url, "_blank") });
   out.push({ icon: "🌗", title: "Toggle theme", sub: "dark / light", key: "action", run: () => toggleTheme() });
   out.push({ icon: "🔄", title: "Refresh data now", sub: state.mode + " mode", key: "action", run: () => refreshNow() });
@@ -2259,19 +2129,6 @@ function wire(){
     }
   });
 
-  // market
-  $("mktSearch").addEventListener("input", renderMarket);
-  $("mktType").addEventListener("change", renderMarket);
-  $("mktSort").addEventListener("change", renderMarket);
-  $("abroadCountry").addEventListener("change", renderAbroad);
-  document.querySelectorAll("[data-mkt]").forEach(b =>
-    b.addEventListener("click", () => {
-      document.querySelectorAll("[data-mkt]").forEach(x => x.classList.toggle("active", x === b));
-      state.mktView = b.dataset.mkt;
-      $("mktList").hidden = state.mktView !== "db";
-      $("abroadWrap").hidden = state.mktView !== "abroad";
-      if(state.mktView === "abroad") renderAbroad(); else renderMarket();
-    }));
 
   // alerts
   $("btnNotifPerm").addEventListener("click", async () => {
