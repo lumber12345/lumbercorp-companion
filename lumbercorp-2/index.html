@@ -591,6 +591,11 @@
         <div class="setrow" id="capsRow" hidden>
           <div><div class="st">Key access detected</div><div class="sd" id="capsTxt"></div></div>
         </div>
+        <div class="setrow" style="flex-direction:column;align-items:stretch;gap:8px">
+          <div><div class="st">API diagnostics</div><div class="sd">Test each selection against your saved key — shows Torn's exact answer</div></div>
+          <div style="display:flex;gap:7px;flex-wrap:wrap" id="diagBtns"></div>
+          <div id="diagOut" style="font-size:12px;font-family:ui-monospace,SFMono-Regular,monospace;color:var(--muted);display:flex;flex-direction:column;gap:4px"></div>
+        </div>
         <div class="setrow">
           <div style="min-width:140px"><div class="st">Torn API key</div><div class="sd">Stored only in this browser</div></div>
           <div class="keyrow">
@@ -759,7 +764,7 @@ function flagEmoji(cc){
 }
 
 /* ---------- settings ---------- */
-const APP_VERSION = "2.0.4";
+const APP_VERSION = "2.0.5";
 const DEFAULT_SETTINGS = {
   mode: "demo", apiKey: "", refresh: 60,
   theme: "dark", accent: "amber",
@@ -943,6 +948,7 @@ const state = {
   statsError: null,
   factionless: false,
   factionError: null,
+  factionErrorCode: null,
   caps: null,
   notified: { energy:false, flight:false, drug:false, medical:false, booster:false },
   prevCds: null,
@@ -1050,45 +1056,70 @@ async function loadLive(){
       state.statsLoaded = true; state.statsError = null; state.caps.stats = true;
     } else { state.statsLoaded = false; state.statsError = "empty response from Torn"; }
   }catch(e){ state.statsLoaded = false; state.statsError = describeApiError(e); }
+  /* --- faction, in three tiers of detail ---
+     1) The `profile` response ALREADY carries a faction block
+        { faction_id, faction_name, faction_tag, days_in_faction } and is
+        readable by low-level keys. Use it as the baseline — never discard it.
+     2) The dedicated `faction` selection adds the same (when key allows).
+     3) The /faction endpoint (Faction Access) adds leader/respect/members. */
+  state.factionError = null;
+  state.factionErrorCode = null;
+  let hadProfileFaction = false;
+  const pf = u.faction;
+  if(pf && (pf.faction_id ?? pf.id)){
+    state.faction = {
+      name: pf.faction_name ?? pf.name ?? null,
+      tag: pf.faction_tag ?? pf.tag ?? null,
+      age: pf.days_in_faction ?? null,
+      leader: null, respect: null, members: null, best_chain: null
+    };
+    state.factionless = false;
+    state.caps.faction = true;
+    hadProfileFaction = true;
+  } else if(pf){
+    state.faction = null;          // faction_id 0 → genuinely factionless
+    state.factionless = true;
+  }
   try{
     const f = await tornUser("faction");
     const raw = f && f.faction;
     if(raw && raw.faction_id){
-      /* user selection returns { faction_id, faction_name, faction_tag,
-         days_in_faction } — normalize to our display shape */
       state.faction = {
         name: raw.faction_name || null,
         tag: raw.faction_tag || null,
         age: raw.days_in_faction ?? null,
         leader: null, respect: null, members: null, best_chain: null
       };
+      state.factionless = false;
       state.caps.faction = true;
-      state.factionError = null;
-      /* Enrich from the faction endpoint when the key has Faction Access
-         (adds leader, respect, member count, best chain). Fails soft. */
-      try{
-        const fb = await tornFaction("basic,members");
-        if(fb && fb.ID){
-          state.faction = {
-            name: fb.name || state.faction.name,
-            tag: fb.tag || state.faction.tag,
-            leader: fb.leader || null,
-            respect: fb.respect ?? null,
-            age: fb.age ?? state.faction.age,
-            best_chain: fb.best_chain ?? null,
-            members: fb.members ? Object.keys(fb.members).length : null
-          };
-        }
-      }catch(e2){}
-    } else {
-      state.faction = null;          // faction_id 0 → genuinely factionless
-      state.factionless = true;
-      state.factionError = null;
+    } else if(!hadProfileFaction){
+      state.faction = null; state.factionless = true;
     }
   }catch(e){
-    state.faction = null;
-    state.factionless = false;
-    state.factionError = describeApiError(e);   // key level, API down, etc.
+    /* dedicated call failed — keep whatever profile gave us */
+    if(!hadProfileFaction){
+      state.faction = null; state.factionless = false;
+      state.factionError = describeApiError(e);
+      state.factionErrorCode = e.code ?? null;
+    }
+  }
+  if(state.caps.faction){
+    /* Enrich from the faction endpoint when the key has Faction Access
+       (adds leader, respect, member count, best chain). Fails soft. */
+    try{
+      const fb = await tornFaction("basic,members");
+      if(fb && fb.ID && state.faction){
+        state.faction = {
+          name: fb.name || state.faction.name,
+          tag: fb.tag || state.faction.tag,
+          leader: fb.leader || null,
+          respect: fb.respect ?? null,
+          age: fb.age ?? state.faction.age,
+          best_chain: fb.best_chain ?? null,
+          members: fb.members ? Object.keys(fb.members).length : null
+        };
+      }
+    }catch(e2){}
   }
   renderAll();
   scheduleLive();
@@ -1543,7 +1574,7 @@ function renderStats(){
     facHtml = `<div class="card faction">
       <div class="femblem">🏰</div>
       <div><div class="fname">Faction unavailable <span class="chip warn">live</span></div>
-      <div class="fsub">${escHtml(state.factionError)}. Your API key needs a higher access level to read faction data — create a <b>Limited Access</b> key in
+      <div class="fsub">${escHtml(state.factionError)}${state.factionErrorCode != null ? " (Torn error " + state.factionErrorCode + ")" : ""}. Try: <button class="btn sm" id="facRetry">↻ Retry</button> · or create a <b>Limited Access</b> key in
       <a href="https://www.torn.com/preferences.php#tab=api" target="_blank" rel="noopener">Torn → Settings → API keys</a> and paste it in Settings. All Torn data stays in your browser.</div></div>
     </div>`;
   } else if(state.factionless){
@@ -1559,6 +1590,8 @@ function renderStats(){
     </div>`;
   }
   $("factionBox").innerHTML = facHtml;
+  const frb = $("facRetry");
+  if(frb) frb.addEventListener("click", () => loadLive());
   const ps = state.user.personalstats || {};
   $("statsGrid").innerHTML = STAT_DEFS.map(s => `
     <div class="card stat"><div class="sl">${s.icon} ${s.label}</div>
@@ -1618,6 +1651,39 @@ function renderSettings(){
   });
   renderActionsMgr();
   renderNotifState();
+  renderDiagBtns();
+}
+/* --- API diagnostics: fire one selection at the key and show the raw truth --- */
+async function diagSelection(sel){
+  try{
+    const j = await tornUser(sel);
+    if(sel === "faction"){
+      const r = (j && j.faction) || {};
+      return { ok:true, msg: `faction_id=${r.faction_id ?? "none"} name=${r.faction_name || "—"} tag=${r.faction_tag || "—"} days=${r.days_in_faction ?? "—"}` };
+    }
+    return { ok:true, msg: "ok · fields: " + Object.keys(j || {}).slice(0, 6).join(", ") };
+  }catch(e){
+    return { ok:false, msg: describeApiError(e) + (e.code != null ? " [Torn code " + e.code + "]" : "") };
+  }
+}
+function renderDiagBtns(){
+  const box = $("diagBtns");
+  if(!box || box.dataset.wired) return;
+  box.dataset.wired = "1";
+  for(const sel of ["profile", "bars", "money", "personalstats", "faction"]){
+    const b = document.createElement("button");
+    b.className = "btn sm";
+    b.textContent = "Test " + sel;
+    b.addEventListener("click", async () => {
+      b.disabled = true; b.textContent = "…";
+      const r = await diagSelection(sel);
+      const line = document.createElement("div");
+      line.innerHTML = `<span style="color:${r.ok ? "var(--ok)" : "var(--bad)"}">${r.ok ? "✅" : "⛔"}</span> ${escHtml(sel)}: ${escHtml(r.msg)}`;
+      $("diagOut").prepend(line);
+      b.disabled = false; b.textContent = "Test " + sel;
+    });
+    box.appendChild(b);
+  }
 }
 function renderActionsMgr(){
   $("actionsMgr").innerHTML = actionsList().map(a => {
@@ -2011,7 +2077,7 @@ function setMode(m){
     state.faction = null;
     state.itemCache = null;
     state.items = demoItems();
-    state.statsLoaded = false; state.statsError = null; state.factionError = null; state.factionless = false; state.caps = null;
+    state.statsLoaded = false; state.statsError = null; state.factionError = null; state.factionErrorCode = null; state.factionless = false; state.caps = null;
     state.notified = { energy:false, flight:false, drug:false, medical:false, booster:false };
     state.lastUpdated = Date.now();
     renderMode(); renderAll();
@@ -2023,7 +2089,7 @@ function setMode(m){
     if(liveTimer) clearTimeout(liveTimer);
     state.user = demoUser(); state.faction = demoFaction();
     state.items = demoItems(); state.itemCache = null;
-    state.statsLoaded = false; state.statsError = null; state.factionError = null; state.factionless = false; state.caps = null;
+    state.statsLoaded = false; state.statsError = null; state.factionError = null; state.factionErrorCode = null; state.factionless = false; state.caps = null;
     state.lastUpdated = Date.now();
     renderMode(); renderAll();
     toast("🟡 Demo mode — simulated player", "ok");
@@ -2054,7 +2120,7 @@ function init(){
     state.faction = null;
     state.itemCache = null;
     state.items = demoItems();
-    state.statsLoaded = false; state.statsError = null; state.factionError = null; state.factionless = false; state.caps = null;
+    state.statsLoaded = false; state.statsError = null; state.factionError = null; state.factionErrorCode = null; state.factionless = false; state.caps = null;
     renderAll();
     loadLive();
   }
