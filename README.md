@@ -13,6 +13,25 @@ cd lumbercorp-2
 python3 -m http.server 8000     # or any static server; then open http://localhost:8000
 ```
 
+### Deploy on Render (v2.4.0+)
+
+`render.yaml` is a **Blueprint** that deploys both pieces in one click
+(Render → **New → Blueprint** → this repo):
+
+| Service | What | Notes |
+| --- | --- | --- |
+| `lumbercorp2` | Static site — the PWA (`lumbercorp-2/`) | Free tier, no build; serves `/` with SPA rewrite, `no-cache` on `sw.js`/`manifest`/`config.js` |
+| `lumbercorp2-proxy` | Tiny Torn v2 proxy (`proxy/server.js`) | Zero-dep Node, health check `/api/ping`, 10 s cache, allow-listed paths, CORS open, keys never logged |
+
+Then in the Render dashboard set `RW_PROXY_URL` (on the **static** service)
+to the proxy's URL, e.g. `https://lumbercorp2-proxy.onrender.com`, and
+redeploy the static site — the build stamps it into `config.js` and the
+**Rank Wars** tab auto-connects. (You can also just paste the proxy URL in
+the app's Rank Wars → Connect card; it's stored per-browser.)
+
+Static-only deploy: delete the proxy service from `render.yaml` — Rank Wars
+falls back to demo mode until any rankwars-compatible proxy is configured.
+
 New over 1.0:
 
 - **Live bar ETAs** — energy/nerve/happy/life tick client-side with “full in …” countdowns
