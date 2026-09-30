@@ -1,0 +1,1923 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark" data-accent="amber">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d0b08">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<title>LumberCorp 2.0 — the next-gen PDA</title>
+<style>
+  :root{
+    --bg:#0d0b08; --bg2:#141109; --card:#191510; --card2:#221c14; --card3:#2b2318;
+    --border:#2e2619; --border2:#3e3323;
+    --text:#f3ede2; --muted:#a89e8c; --faint:#6f6654;
+    --energy:#f0b429; --nerve:#e5484d; --happy:#30a46c; --life:#f76b15;
+    --ok:#3dd68c; --warn:#f5a524; --bad:#f05c5c; --info:#5ab8ff; --travel:#c084fc;
+    --accent:#f5a524; --accent2:#ffc65c; --glow:rgba(245,165,36,.35);
+    --shadow:0 10px 34px rgba(0,0,0,.45);
+    --radius:16px;
+  }
+  [data-accent="ember"]{ --accent:#ff6b4a; --accent2:#ff927a; --glow:rgba(255,107,74,.35); }
+  [data-accent="jade"] { --accent:#2fbf71; --accent2:#63d99c; --glow:rgba(47,191,113,.35); }
+  [data-accent="violet"]{ --accent:#8b5cf6; --accent2:#b08cff; --glow:rgba(139,92,246,.35); }
+  [data-accent="ice"]  { --accent:#38bdf8; --accent2:#7dd3fc; --glow:rgba(56,189,248,.35); }
+  [data-theme="light"]{
+    --bg:#f4efe4; --bg2:#faf6ec; --card:#ffffff; --card2:#f6f1e6; --card3:#efe8d8;
+    --border:#e2d9c6; --border2:#cfc3aa;
+    --text:#241f16; --muted:#6d6350; --faint:#9a8f78;
+    --shadow:0 10px 28px rgba(80,60,20,.10);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Helvetica,Arial,sans-serif;
+    line-height:1.45; min-height:100vh;
+    transition:background .25s,color .25s;
+  }
+  /* wood-grain ambience */
+  .bg-wood{
+    position:fixed; inset:0; z-index:-1; pointer-events:none; opacity:.55;
+    background:
+      radial-gradient(1100px 560px at 88% -10%, var(--glow), transparent 62%),
+      radial-gradient(900px 520px at -12% 24%, rgba(120,80,30,.10), transparent 60%),
+      repeating-linear-gradient(93deg, transparent 0 26px, rgba(120,84,34,.045) 26px 28px, transparent 28px 58px, rgba(120,84,34,.03) 58px 60px);
+  }
+  [data-theme="light"] .bg-wood{opacity:.5}
+  ::selection{background:var(--glow)}
+  a{color:var(--accent2)}
+  input,select,button,textarea{font:inherit;color:inherit}
+  .num{font-variant-numeric:tabular-nums}
+
+  /* ================= layout ================= */
+  .shell{display:grid;grid-template-columns:236px 1fr;min-height:100vh}
+  aside{
+    border-right:1px solid var(--border); padding:18px 14px; position:sticky; top:0;
+    height:100vh; display:flex; flex-direction:column; gap:6px;
+    background:linear-gradient(180deg, var(--bg2), var(--bg));
+  }
+  main{padding:0 20px 96px; max-width:980px; width:100%; margin:0 auto; min-width:0}
+  @media (max-width:880px){
+    .shell{grid-template-columns:1fr}
+    aside{display:none}
+    main{padding:0 12px 110px}
+  }
+
+  /* ================= rail ================= */
+  .logo{display:flex;align-items:center;gap:10px;padding:4px 6px 14px}
+  .logo .mark{
+    width:40px;height:40px;border-radius:12px;flex:0 0 auto;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));
+    display:grid;place-items:center;font-size:20px;color:#1a1206;font-weight:900;
+    box-shadow:0 6px 18px var(--glow);
+  }
+  .logo .word{font-weight:800;font-size:16.5px;letter-spacing:.2px;line-height:1.1}
+  .logo .word small{display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.6px;margin-top:2px}
+  .vtag{background:var(--accent);color:#1a1206;border-radius:5px;padding:0 4px;font-size:9.5px;font-weight:900;letter-spacing:.5px}
+  .navitem{
+    display:flex;align-items:center;gap:11px;width:100%;text-align:left;
+    background:none;border:none;color:var(--muted);cursor:pointer;
+    padding:10px 12px;border-radius:11px;font-size:14px;font-weight:600;transition:.15s;
+  }
+  .navitem:hover{background:var(--card);color:var(--text)}
+  .navitem.active{background:var(--card2);color:var(--text);box-shadow:inset 0 0 0 1px var(--border2)}
+  .navitem .ni{width:20px;text-align:center;font-size:16px}
+  .navitem .badge{
+    margin-left:auto;background:var(--accent);color:#1a1206;font-size:10.5px;font-weight:800;
+    min-width:18px;height:18px;border-radius:99px;display:grid;place-items:center;padding:0 5px;
+  }
+  .railfoot{margin-top:auto;display:flex;flex-direction:column;gap:8px}
+  .modebadge{
+    display:flex;align-items:center;gap:7px;padding:8px 11px;border-radius:11px;
+    background:var(--card);border:1px solid var(--border);font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;
+  }
+  .modebadge .dot{width:8px;height:8px;border-radius:50%;background:var(--warn);animation:pulse 2s infinite}
+  .modebadge.live .dot{background:var(--ok)}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  .clockbox{padding:4px 11px;font-size:11.5px;color:var(--faint);line-height:1.6}
+  .clockbox b{color:var(--muted);font-variant-numeric:tabular-nums;font-weight:600}
+
+  /* ================= bottom tabbar (mobile) ================= */
+  .tabbar{
+    display:none;position:fixed;left:0;right:0;bottom:0;z-index:60;
+    background:color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    border-top:1px solid var(--border);
+    padding:6px 8px calc(6px + env(safe-area-inset-bottom));
+    grid-template-columns:repeat(6,1fr);gap:2px;
+  }
+  .tabbar button{
+    background:none;border:none;color:var(--faint);cursor:pointer;
+    display:flex;flex-direction:column;align-items:center;gap:2px;
+    font-size:10px;font-weight:700;padding:6px 0 4px;border-radius:10px;position:relative;
+  }
+  .tabbar button .ti{font-size:17px;line-height:1.2}
+  .tabbar button.active{color:var(--accent)}
+  .tabbar .badge{
+    position:absolute;top:2px;right:calc(50% - 20px);
+    background:var(--accent);color:#1a1206;font-size:9.5px;font-weight:800;
+    min-width:16px;height:16px;border-radius:99px;display:grid;place-items:center;padding:0 4px;
+  }
+  @media (max-width:880px){ .tabbar{display:grid} }
+
+  /* ================= topbar ================= */
+  .topbar{
+    position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:10px;
+    padding:14px 2px 12px;
+    background:linear-gradient(180deg, var(--bg) 78%, transparent);
+  }
+  .topbar h1{font-size:19px;font-weight:800;letter-spacing:.2px}
+  .topbar .sub{font-size:12px;color:var(--faint);margin-top:-1px}
+  .spacer{flex:1}
+  .iconbtn{
+    background:var(--card);border:1px solid var(--border);color:var(--text);
+    min-width:38px;height:38px;border-radius:11px;cursor:pointer;font-size:15px;
+    display:inline-grid;place-items:center;transition:.15s;padding:0 9px;
+  }
+  .iconbtn:hover{border-color:var(--border2);background:var(--card2)}
+  .iconbtn:active{transform:scale(.94)}
+  .iconbtn.spin{animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .kbadge{
+    display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--faint);
+    border:1px solid var(--border);border-radius:7px;padding:2px 7px;background:var(--card);
+  }
+
+  /* ================= cards & bits ================= */
+  .sec{font-size:12.5px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;color:var(--faint);margin:22px 2px 10px}
+  .sec:first-child{margin-top:6px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:7px;
+    background:var(--card2);border:1px solid var(--border2);color:var(--text);
+    padding:9px 15px;border-radius:11px;cursor:pointer;font-size:13.5px;font-weight:700;transition:.15s;
+  }
+  .btn:hover{background:var(--card3)}
+  .btn:active{transform:scale(.97)}
+  .btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));border-color:transparent;color:#1a1206;box-shadow:0 4px 16px var(--glow)}
+  .btn.primary:hover{filter:brightness(1.06)}
+  .btn.danger{color:var(--bad);border-color:color-mix(in srgb, var(--bad) 40%, var(--border))}
+  .btn.sm{padding:6px 11px;font-size:12.5px;border-radius:9px}
+  .chip{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;color:var(--muted);background:var(--card2);border:1px solid var(--border);border-radius:99px;padding:3px 9px}
+  .chip.ok{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 35%,var(--border))}
+  .chip.warn{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 35%,var(--border))}
+  .chip.bad{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 35%,var(--border))}
+  .chip.accent{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 40%,var(--border))}
+  .grid{display:grid;gap:12px}
+  .g2{grid-template-columns:1fr 1fr}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  @media (max-width:700px){ .g3{grid-template-columns:1fr 1fr} .g2{grid-template-columns:1fr} }
+
+  /* ================= identity card ================= */
+  .idcard{position:relative;overflow:hidden;padding:18px;display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+  .idcard::before{
+    content:"";position:absolute;right:-70px;top:-70px;width:230px;height:230px;border-radius:50%;
+    background:radial-gradient(circle, var(--glow), transparent 70%);pointer-events:none;
+  }
+  .avatar{
+    width:64px;height:64px;border-radius:16px;flex:0 0 auto;
+    background:linear-gradient(135deg,var(--card3),var(--card2));
+    border:1px solid var(--border2);display:grid;place-items:center;
+    font-size:26px;font-weight:900;color:var(--accent);
+  }
+  .idmain{min-width:180px;flex:1}
+  .idname{font-size:18px;font-weight:800;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .idsub{font-size:12.5px;color:var(--muted);margin-top:2px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .idstatus{display:flex;align-items:center;gap:6px;font-size:12.5px;margin-top:5px;color:var(--muted)}
+  .idstatus .sdot{width:8px;height:8px;border-radius:50%;background:var(--ok)}
+  .idmoney{display:flex;gap:22px;margin-left:auto;text-align:right;flex-wrap:wrap}
+  .idmoney .m small{display:block;font-size:10.5px;font-weight:700;letter-spacing:.8px;color:var(--faint);text-transform:uppercase}
+  .idmoney .m b{font-size:16.5px;font-weight:800;font-variant-numeric:tabular-nums}
+
+  /* ================= bars ================= */
+  .barcard{padding:14px 15px;position:relative;overflow:hidden}
+  .barcard .top{display:flex;align-items:baseline;gap:7px}
+  .barcard .top .lbl{font-size:12.5px;font-weight:800;letter-spacing:.4px}
+  .barcard .top .eta{margin-left:auto;font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums;font-weight:600}
+  .barcard .v{font-size:19px;font-weight:800;font-variant-numeric:tabular-nums;margin:4px 0 8px}
+  .barcard .v small{font-size:12px;color:var(--faint);font-weight:600}
+  .track{height:8px;border-radius:99px;background:var(--card3);overflow:hidden;position:relative}
+  .fill{height:100%;border-radius:99px;position:relative;transition:width .8s cubic-bezier(.3,.7,.3,1)}
+  .fill::after{
+    content:"";position:absolute;inset:0;
+    background:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.35) 50%,transparent 70%);
+    animation:shimmer 2.4s linear infinite;background-size:200% 100%;
+  }
+  @keyframes shimmer{from{background-position:200% 0}to{background-position:-200% 0}}
+  .fill.energy{background:linear-gradient(90deg,#c98f16,var(--energy))}
+  .fill.nerve{background:linear-gradient(90deg,#b03438,var(--nerve))}
+  .fill.happy{background:linear-gradient(90deg,#1f7a4b,var(--happy))}
+  .fill.life{background:linear-gradient(90deg,#c2530f,var(--life))}
+
+  /* ================= actions ================= */
+  .actgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:9px}
+  .act{
+    display:flex;flex-direction:column;align-items:center;gap:7px;text-decoration:none;color:var(--text);
+    background:var(--card);border:1px solid var(--border);border-radius:13px;padding:13px 6px 10px;
+    transition:.15s;position:relative;
+  }
+  .act:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:0 6px 16px var(--glow)}
+  .act .ai{font-size:21px;line-height:1}
+  .act .an{font-size:11.5px;font-weight:700;color:var(--muted)}
+  .act .rm{
+    position:absolute;top:4px;right:4px;width:18px;height:18px;border-radius:6px;border:none;cursor:pointer;
+    background:var(--card3);color:var(--faint);font-size:10px;display:none;place-items:center;line-height:1;
+  }
+  .act:hover .rm{display:grid}
+  .act .rm:hover{color:var(--bad)}
+  .act.add{cursor:pointer;border-style:dashed;color:var(--faint)}
+  .act.add .ai{font-size:18px;opacity:.8}
+
+  /* ================= cooldowns ================= */
+  .cdrow{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  @media (max-width:700px){ .cdrow{grid-template-columns:1fr} }
+  .cdcard{padding:14px 15px;display:flex;align-items:center;gap:12px}
+  .cdcard .ci{font-size:22px}
+  .cdcard .cl{font-size:12px;font-weight:800;letter-spacing:.4px;color:var(--muted)}
+  .cdcard .cv{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;margin-top:1px}
+  .cdcard.ready .cv{color:var(--ok)}
+
+  /* ================= flight ================= */
+  .flightmini{padding:15px 16px;display:flex;align-items:center;gap:13px}
+  .flightmini .fi{font-size:24px}
+  .flightmini .ft{font-size:13.5px;font-weight:700}
+  .flightmini .fs{font-size:12px;color:var(--muted);margin-top:1px}
+  .flightmini .fc{margin-left:auto;text-align:right}
+  .flightmini .fc b{font-size:16px;font-variant-numeric:tabular-nums}
+  .plan{padding:16px;display:grid;gap:12px}
+  .frow{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media (max-width:700px){ .frow{grid-template-columns:1fr} }
+  .field label{display:block;font-size:11px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--faint);margin-bottom:6px}
+  .field select,.field input[type=text],.field input[type=password],.field input[type=number]{
+    width:100%;background:var(--card2);border:1px solid var(--border2);border-radius:10px;
+    padding:10px 12px;font-size:13.5px;font-weight:600;outline:none;transition:.15s;
+  }
+  .field select:focus,.field input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--glow)}
+  .planinfo{display:flex;gap:18px;flex-wrap:wrap;padding:11px 13px;background:var(--card2);border:1px solid var(--border);border-radius:11px;font-size:12.5px;color:var(--muted)}
+  .planinfo b{color:var(--text);font-variant-numeric:tabular-nums}
+  .restock{padding:13px 15px;display:flex;align-items:center;gap:13px}
+  .restock .track{flex:1;height:6px}
+  .restock .fill.restockfill{background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width 1s linear}
+  .destgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:12px}
+  .dest{padding:14px;cursor:pointer;transition:.15s;position:relative}
+  .dest:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 8px 20px var(--glow)}
+  .dest .dhead{display:flex;align-items:center;gap:9px}
+  .dest .fl{font-size:24px}
+  .dest .dc{font-weight:800;font-size:14px;line-height:1.15}
+  .dest .dy{font-size:11px;color:var(--faint);margin-top:1px}
+  .dest .dtime{margin-left:auto;font-size:11px;font-weight:800;color:var(--accent);background:var(--card2);border:1px solid var(--border);padding:3px 8px;border-radius:8px;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .dest .ditems{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}
+  .dest .itemchip{font-size:10.5px;background:var(--card2);border:1px solid var(--border);color:var(--muted);border-radius:7px;padding:2px 7px;font-weight:600}
+  .dest .itemchip b{color:var(--text)}
+  .dest .itemchip .zero{opacity:.45}
+
+  /* ================= market ================= */
+  .mktbar{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+  .mktbar input[type=search]{
+    flex:1;min-width:180px;background:var(--card);border:1px solid var(--border2);border-radius:11px;
+    padding:10px 13px;font-size:13.5px;outline:none;
+  }
+  .mktbar input[type=search]:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--glow)}
+  .mktbar select{background:var(--card);border:1px solid var(--border2);border-radius:11px;padding:9px 10px;font-size:13px;font-weight:600;outline:none}
+  .seg{display:inline-flex;background:var(--card);border:1px solid var(--border2);border-radius:11px;padding:3px;gap:3px}
+  .seg button{border:none;background:none;color:var(--muted);font-size:12.5px;font-weight:700;padding:7px 13px;border-radius:8px;cursor:pointer;transition:.15s}
+  .seg button.active{background:var(--card3);color:var(--text);box-shadow:inset 0 0 0 1px var(--border2)}
+  .ilist{display:flex;flex-direction:column;gap:7px}
+  .irow{display:flex;align-items:center;gap:12px;padding:10px 13px;background:var(--card);border:1px solid var(--border);border-radius:12px}
+  .irow .ii{font-size:19px;width:26px;text-align:center;flex:0 0 auto}
+  .irow .im{min-width:0;flex:1}
+  .irow .in{font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .irow .it{font-size:11px;color:var(--faint)}
+  .irow .ip{text-align:right;font-size:13px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .irow .ip small{display:block;font-size:10.5px;color:var(--faint);font-weight:600}
+  .irow .spread{font-size:11px;font-weight:800;border-radius:7px;padding:2px 7px;background:var(--card2);border:1px solid var(--border);color:var(--muted);white-space:nowrap}
+  .irow .spread.up{color:var(--ok)}
+  .irow .spread.down{color:var(--bad)}
+  .star{background:none;border:none;cursor:pointer;font-size:16px;color:var(--faint);padding:2px}
+  .star.on{color:var(--warn)}
+  .tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+  .tbl th{font-size:10.5px;text-transform:uppercase;letter-spacing:.8px;color:var(--faint);text-align:left;padding:8px 10px;border-bottom:1px solid var(--border)}
+  .tbl td{padding:9px 10px;border-bottom:1px solid var(--border);font-variant-numeric:tabular-nums}
+  .tbl tr:last-child td{border-bottom:none}
+  .tbl .r{text-align:right}
+  .profit-up{color:var(--ok);font-weight:800}
+  .profit-down{color:var(--bad);font-weight:700}
+  .tblwrap{overflow-x:auto;border-radius:var(--radius)}
+
+  /* ================= stats ================= */
+  .statgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+  .stat{padding:13px 14px}
+  .stat .sl{font-size:11px;font-weight:700;color:var(--faint);display:flex;gap:6px;align-items:center}
+  .stat .sv{font-size:17px;font-weight:800;font-variant-numeric:tabular-nums;margin-top:4px}
+  .faction{padding:16px;display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+  .faction .femblem{width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,var(--card3),var(--card2));border:1px solid var(--border2);display:grid;place-items:center;font-size:23px}
+  .faction .fname{font-weight:800;font-size:15.5px}
+  .faction .fsub{font-size:12px;color:var(--muted)}
+  .faction .fstats{margin-left:auto;display:flex;gap:20px;text-align:right;flex-wrap:wrap}
+  .faction .fstats small{display:block;font-size:10px;letter-spacing:.7px;text-transform:uppercase;color:var(--faint);font-weight:700}
+  .faction .fstats b{font-size:15px;font-variant-numeric:tabular-nums}
+
+  /* ================= alerts / activity ================= */
+  .feed{display:flex;flex-direction:column;gap:7px}
+  .fitem{display:flex;gap:11px;align-items:flex-start;padding:11px 13px;background:var(--card);border:1px solid var(--border);border-radius:12px}
+  .fitem .fico{font-size:16px;line-height:1.3}
+  .fitem .ftx{font-size:13px}
+  .fitem .ftm{font-size:11px;color:var(--faint);margin-top:1px}
+  .empty{padding:26px;text-align:center;color:var(--faint);font-size:13px;border:1px dashed var(--border2);border-radius:var(--radius)}
+
+  /* ================= settings ================= */
+  .setcard{padding:16px;display:flex;flex-direction:column;gap:12px}
+  .setrow{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .setrow .st{font-size:13.5px;font-weight:700}
+  .setrow .sd{font-size:12px;color:var(--muted);margin-top:1px}
+  .switch{position:relative;width:44px;height:25px;flex:0 0 auto;margin-left:auto}
+  .switch input{opacity:0;width:100%;height:100%;position:absolute;cursor:pointer;z-index:2;margin:0}
+  .switch .sl2{position:absolute;inset:0;background:var(--card3);border:1px solid var(--border2);border-radius:99px;transition:.2s}
+  .switch .sl2::after{content:"";position:absolute;top:2px;left:2px;width:19px;height:19px;border-radius:50%;background:var(--muted);transition:.2s}
+  .switch input:checked + .sl2{background:var(--glow);border-color:var(--accent)}
+  .switch input:checked + .sl2::after{left:21px;background:var(--accent)}
+  .accentrow{display:flex;gap:9px}
+  .swatch{width:30px;height:30px;border-radius:10px;cursor:pointer;border:2px solid transparent;transition:.15s}
+  .swatch.sel{border-color:var(--text);transform:scale(1.1)}
+  .keyrow{display:flex;gap:8px;flex:1;min-width:220px}
+  .keyrow input{flex:1}
+
+  /* ================= overlays ================= */
+  .overlay{
+    position:fixed;inset:0;z-index:100;background:rgba(8,6,3,.6);
+    backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+    display:none;align-items:flex-start;justify-content:center;padding:12vh 16px 16px;
+  }
+  .overlay.open{display:flex;animation:fadein .15s ease}
+  @keyframes fadein{from{opacity:0}to{opacity:1}}
+  .modal{
+    width:100%;max-width:560px;background:var(--card);border:1px solid var(--border2);
+    border-radius:18px;box-shadow:var(--shadow);overflow:hidden;animation:pop .18s cubic-bezier(.2,.9,.3,1.2);
+  }
+  @keyframes pop{from{transform:scale(.96) translateY(8px);opacity:0}to{transform:none;opacity:1}}
+  .palinput{
+    width:100%;background:none;border:none;outline:none;padding:16px 18px;font-size:15.5px;font-weight:600;
+    border-bottom:1px solid var(--border);
+  }
+  .pallist{max-height:46vh;overflow-y:auto;padding:7px}
+  .palitem{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:none;border:none;cursor:pointer;padding:10px 12px;border-radius:11px}
+  .palitem .pi{font-size:17px;width:24px;text-align:center}
+  .palitem .pt{font-size:13.5px;font-weight:700}
+  .palitem .ps{font-size:11.5px;color:var(--faint)}
+  .palitem .pk{margin-left:auto;font-size:10px;color:var(--faint);border:1px solid var(--border);border-radius:5px;padding:1px 5px}
+  .palitem:hover,.palitem.sel{background:var(--card2)}
+  .palfoot{display:flex;gap:14px;padding:9px 16px;border-top:1px solid var(--border);font-size:10.5px;color:var(--faint)}
+  .sheethead{display:flex;align-items:center;gap:11px;padding:15px 17px;border-bottom:1px solid var(--border)}
+  .sheethead .st1{font-size:15.5px;font-weight:800}
+  .sheethead .st2{font-size:11.5px;color:var(--faint)}
+  .sheetbody{max-height:56vh;overflow-y:auto;padding:13px 17px 17px}
+
+  /* ================= toasts ================= */
+  #toasts{position:fixed;bottom:calc(20px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);z-index:200;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;width:min(92vw,460px)}
+  .toast{
+    background:var(--card);border:1px solid var(--border2);border-left:3px solid var(--accent);
+    color:var(--text);font-size:13px;font-weight:600;padding:11px 15px;border-radius:12px;
+    box-shadow:var(--shadow);animation:toastin .25s cubic-bezier(.2,.9,.3,1.2);max-width:100%;
+  }
+  .toast.ok{border-left-color:var(--ok)} .toast.bad{border-left-color:var(--bad)} .toast.warn{border-left-color:var(--warn)}
+  @keyframes toastin{from{transform:translateY(14px);opacity:0}to{transform:none;opacity:1}}
+  .toast.out{transition:.3s;opacity:0;transform:translateY(8px)}
+
+  .updated{font-size:11px;color:var(--faint);text-align:right;margin-top:8px}
+  [hidden]{display:none !important}
+</style>
+</head>
+<body>
+<div class="bg-wood"></div>
+
+<div class="shell">
+  <!-- ================= side rail ================= -->
+  <aside>
+    <div class="logo">
+      <div class="mark">🪵</div>
+      <div class="word">LumberCorp
+        <small><span class="vtag">2.0</span> THE NEXT-GEN PDA</small>
+      </div>
+    </div>
+    <button class="navitem active" data-page="dashboard"><span class="ni">⚡</span> Dashboard</button>
+    <button class="navitem" data-page="flight"><span class="ni">✈️</span> Flight</button>
+    <button class="navitem" data-page="market"><span class="ni">💱</span> Market</button>
+    <button class="navitem" data-page="stats"><span class="ni">📈</span> Stats</button>
+    <button class="navitem" data-page="alerts"><span class="ni">🔔</span> Alerts <span class="badge" id="alertBadge" hidden>0</span></button>
+    <button class="navitem" data-page="settings"><span class="ni">⚙️</span> Settings</button>
+    <div class="railfoot">
+      <button class="modebadge" id="modeBadge" title="Toggle demo / live mode">
+        <span class="dot"></span><span id="modeBadgeTxt">DEMO MODE</span>
+      </button>
+      <div class="clockbox">
+        Torn <b id="clockTorn">--:--:--</b><br>
+        Local <b id="clockLocal">--:--:--</b>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ================= main ================= -->
+  <main>
+    <div class="topbar">
+      <div>
+        <h1 id="pageTitle">Dashboard</h1>
+        <div class="sub" id="pageSub">Your command center</div>
+      </div>
+      <div class="spacer"></div>
+      <button class="iconbtn" id="btnSearch" title="Search (Ctrl+K)">🔍</button>
+      <button class="iconbtn" id="btnRefresh" title="Refresh data">⟳</button>
+      <button class="iconbtn" id="btnTheme" title="Toggle theme">🌙</button>
+    </div>
+
+    <!-- ============ DASHBOARD ============ -->
+    <section id="page-dashboard">
+      <div class="card idcard">
+        <div class="avatar" id="idAvatar">S</div>
+        <div class="idmain">
+          <div class="idname"><span id="idName">—</span><span class="chip accent" id="idTag">—</span></div>
+          <div class="idsub"><span id="idLevel">—</span> · <span id="idRank">—</span></div>
+          <div class="idstatus"><span class="sdot" id="idStatusDot"></span><span id="idStatus">—</span></div>
+        </div>
+        <div class="idmoney">
+          <div class="m"><small>Cash</small><b id="idMoney" class="num">—</b></div>
+          <div class="m"><small>Networth</small><b id="idNet" class="num">—</b></div>
+          <div class="m"><small>Points</small><b id="idPoints" class="num">—</b></div>
+        </div>
+      </div>
+
+      <h2 class="sec">Bars <span style="text-transform:none;letter-spacing:0;font-weight:600">— live ETA to full</span></h2>
+      <div class="grid g2" id="barsWrap"></div>
+
+      <h2 class="sec">Quick Actions</h2>
+      <div class="actgrid" id="actionsWrap"></div>
+
+      <h2 class="sec">Cooldowns</h2>
+      <div class="cdrow" id="cdsWrap"></div>
+
+      <h2 class="sec">Flight</h2>
+      <div id="flightMini"></div>
+
+      <h2 class="sec">Recent Activity</h2>
+      <div class="feed" id="actPreview"></div>
+      <div class="updated" id="dashUpdated"></div>
+    </section>
+
+    <!-- ============ FLIGHT ============ -->
+    <section id="page-flight" hidden>
+      <div id="activeFlightBox"></div>
+      <h2 class="sec">Travel Planner</h2>
+      <div class="card plan">
+        <div class="frow">
+          <div class="field">
+            <label>Destination</label>
+            <select id="planDest"></select>
+          </div>
+          <div class="field">
+            <label>Travel class</label>
+            <select id="planClass">
+              <option value="standard">Standard</option>
+              <option value="airstrip">Private Airstrip</option>
+              <option value="wlt">WLT (Lean)</option>
+              <option value="business">Business Class</option>
+            </select>
+          </div>
+        </div>
+        <div class="planinfo" id="planInfo"></div>
+        <div style="display:flex;gap:9px;flex-wrap:wrap">
+          <button class="btn primary" id="planGo">✈️ Begin flight</button>
+          <button class="btn" id="planCancel" hidden>Cancel flight</button>
+        </div>
+      </div>
+
+      <h2 class="sec">Abroad Stock</h2>
+      <div class="card restock">
+        <span style="font-size:19px">♻️</span>
+        <div style="min-width:130px">
+          <div style="font-size:12.5px;font-weight:800">Restock cycle</div>
+          <div style="font-size:11px;color:var(--faint)" id="restockTxt">—</div>
+        </div>
+        <div class="track"><div class="fill restockfill" id="restockBar" style="width:0%"></div></div>
+        <button class="iconbtn" id="btnYata" title="Refresh stock feed">⟳</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin:9px 2px 0;flex-wrap:wrap">
+        <span class="chip" id="yataStatus">feed idle</span>
+        <span class="spacer"></span>
+        <button class="btn sm" id="btnReport">📣 Report stock</button>
+      </div>
+      <div class="destgrid" id="destGrid" style="margin-top:12px"></div>
+    </section>
+
+    <!-- ============ MARKET ============ -->
+    <section id="page-market" hidden>
+      <div class="mktbar">
+        <input type="search" id="mktSearch" placeholder="Search items… ( / to focus )">
+        <select id="mktType">
+          <option value="">All types</option>
+          <option>Drug</option><option>Medical</option><option>Armor</option>
+          <option>Weapon</option><option>Other</option><option>Plane</option><option>Car</option>
+        </select>
+        <select id="mktSort">
+          <option value="name">Name</option>
+          <option value="value">Market value ↓</option>
+          <option value="spread">Best flip ↑</option>
+        </select>
+        <div class="seg">
+          <button class="active" data-mkt="db">Item DB</button>
+          <button data-mkt="abroad">Abroad profit</button>
+        </div>
+      </div>
+      <div class="ilist" id="mktList"></div>
+      <div id="abroadWrap" hidden>
+        <div class="field" style="max-width:280px;margin-bottom:12px">
+          <label>Country</label>
+          <select id="abroadCountry"></select>
+        </div>
+        <div class="card tblwrap"><table class="tbl" id="abroadTable"></table></div>
+      </div>
+    </section>
+
+    <!-- ============ STATS ============ -->
+    <section id="page-stats" hidden>
+      <h2 class="sec">Faction</h2>
+      <div id="factionBox"></div>
+      <h2 class="sec">Career Stats</h2>
+      <div class="statgrid" id="statsGrid"></div>
+      <div class="updated" id="statsUpdated"></div>
+    </section>
+
+    <!-- ============ ALERTS ============ -->
+    <section id="page-alerts" hidden>
+      <h2 class="sec">Notifications</h2>
+      <div class="card setcard">
+        <div class="setrow">
+          <div><div class="st">Browser notifications</div><div class="sd" id="notifState">—</div></div>
+          <button class="btn sm" id="btnNotifPerm" style="margin-left:auto">Enable</button>
+        </div>
+        <div class="setrow">
+          <div><div class="st">⚡ Energy full</div><div class="sd">Ping me when energy bar fills</div></div>
+          <label class="switch"><input type="checkbox" id="tglEnergy"><span class="sl2"></span></label>
+        </div>
+        <div class="setrow">
+          <div><div class="st">✈️ Flight landing</div><div class="sd">Ping me when my flight lands</div></div>
+          <label class="switch"><input type="checkbox" id="tglFlight"><span class="sl2"></span></label>
+        </div>
+        <div class="setrow">
+          <div><div class="st">⏱️ Cooldown finished</div><div class="sd">Ping me when a cooldown hits zero</div></div>
+          <label class="switch"><input type="checkbox" id="tglCooldown"><span class="sl2"></span></label>
+        </div>
+      </div>
+      <h2 class="sec">Activity Feed</h2>
+      <div class="feed" id="actList"></div>
+      <div style="margin-top:12px"><button class="btn sm danger" id="btnClearAct">Clear activity</button></div>
+    </section>
+
+    <!-- ============ SETTINGS ============ -->
+    <section id="page-settings" hidden>
+      <h2 class="sec">Data Source</h2>
+      <div class="card setcard">
+        <div class="setrow">
+          <div><div class="st">Mode</div><div class="sd">Demo simulates a player; Live talks to the Torn API</div></div>
+          <div class="seg" style="margin-left:auto">
+            <button data-mode="demo">Demo</button>
+            <button data-mode="live">Live</button>
+          </div>
+        </div>
+        <div class="setrow">
+          <div style="min-width:140px"><div class="st">Torn API key</div><div class="sd">Stored only in this browser</div></div>
+          <div class="keyrow">
+            <input type="password" id="setKey" placeholder="Paste your API key…" autocomplete="off">
+            <button class="btn sm" id="btnTestKey">Test</button>
+          </div>
+        </div>
+        <div class="setrow">
+          <div><div class="st">Refresh interval</div><div class="sd">How often live data re-polls</div></div>
+          <select id="setRefresh" style="margin-left:auto;background:var(--card2);border:1px solid var(--border2);border-radius:10px;padding:8px 10px;font-weight:600">
+            <option value="30">30 s</option>
+            <option value="60">60 s</option>
+            <option value="120">2 min</option>
+            <option value="300">5 min</option>
+          </select>
+        </div>
+      </div>
+
+      <h2 class="sec">Appearance</h2>
+      <div class="card setcard">
+        <div class="setrow">
+          <div><div class="st">Theme</div><div class="sd">Dark timber or warm paper</div></div>
+          <div class="seg" style="margin-left:auto">
+            <button data-theme-val="dark">🌙 Dark</button>
+            <button data-theme-val="light">☀️ Light</button>
+          </div>
+        </div>
+        <div class="setrow">
+          <div><div class="st">Accent</div><div class="sd">Pick your finish</div></div>
+          <div class="accentrow" style="margin-left:auto" id="accentRow"></div>
+        </div>
+      </div>
+
+      <h2 class="sec">Quick Actions</h2>
+      <div class="card setcard">
+        <div id="actionsMgr" style="display:flex;flex-direction:column;gap:7px"></div>
+        <div class="setrow" style="border-top:1px solid var(--border);padding-top:12px">
+          <input type="text" id="addActEmoji" placeholder="Icon" style="width:64px;text-align:center;background:var(--card2);border:1px solid var(--border2);border-radius:10px;padding:9px">
+          <input type="text" id="addActName" placeholder="Name" style="flex:1;min-width:110px;background:var(--card2);border:1px solid var(--border2);border-radius:10px;padding:9px">
+          <input type="text" id="addActUrl" placeholder="https://www.torn.com/…" style="flex:1.4;min-width:160px;background:var(--card2);border:1px solid var(--border2);border-radius:10px;padding:9px">
+          <button class="btn sm primary" id="btnAddAct">Add</button>
+        </div>
+      </div>
+
+      <h2 class="sec">Data</h2>
+      <div class="card setcard">
+        <div class="setrow">
+          <div><div class="st">Export settings &amp; cache</div><div class="sd">Download everything this app stored, as JSON</div></div>
+          <button class="btn sm" id="btnExport" style="margin-left:auto">⬇️ Export</button>
+        </div>
+        <div class="setrow">
+          <div><div class="st">Reset app</div><div class="sd">Wipe settings, caches, flight &amp; activity</div></div>
+          <button class="btn sm danger" id="btnReset" style="margin-left:auto">Reset</button>
+        </div>
+      </div>
+
+      <h2 class="sec">About</h2>
+      <div class="card setcard" style="font-size:13px;color:var(--muted);line-height:1.7">
+        <div><b style="color:var(--text)">LumberCorp 2.0</b> <span class="chip accent">v2.0.0</span></div>
+        <div>
+          What's new over 1.0: live bar ETAs &amp; tick simulation · flight planner with landing countdown + notifications ·
+          restock-cycle ticker · abroad <i>profit</i> table vs market value · ⌘K command palette · watchlists ·
+          themable accents · export/reset. Abroad stock still comes from
+          <a href="https://yata.yt" target="_blank" rel="noopener">YATA</a> with last-good caching (stale-while-revalidate),
+          plus an optional aggregator backend (<code>AGGREGATOR_URL</code>).
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- ================= bottom tabbar (mobile) ================= -->
+<nav class="tabbar" id="tabbar">
+  <button class="active" data-page="dashboard"><span class="ti">⚡</span>Home</button>
+  <button data-page="flight"><span class="ti">✈️</span>Flight</button>
+  <button data-page="market"><span class="ti">💱</span>Market</button>
+  <button data-page="stats"><span class="ti">📈</span>Stats</button>
+  <button data-page="alerts"><span class="ti">🔔</span>Alerts<span class="badge" id="alertBadgeM" hidden>0</span></button>
+  <button data-page="settings"><span class="ti">⚙️</span>Settings</button>
+</nav>
+
+<!-- ================= command palette ================= -->
+<div class="overlay" id="palOverlay">
+  <div class="modal">
+    <input class="palinput" id="palInput" placeholder="Type to jump anywhere — pages, flights, items…" autocomplete="off">
+    <div class="pallist" id="palList"></div>
+    <div class="palfoot"><span>↑↓ navigate</span><span>↵ open</span><span>esc close</span></div>
+  </div>
+</div>
+
+<!-- ================= stock sheet ================= -->
+<div class="overlay" id="stockOverlay">
+  <div class="modal">
+    <div class="sheethead">
+      <span id="sheetFlag" style="font-size:26px">🌍</span>
+      <div><div class="st1" id="sheetTitle">—</div><div class="st2" id="sheetSub">—</div></div>
+      <span class="spacer"></span>
+      <button class="iconbtn" id="sheetClose">✕</button>
+    </div>
+    <div class="sheetbody" id="sheetBody"></div>
+  </div>
+</div>
+
+<div id="toasts"></div>
+<script>
+"use strict";
+/* =====================================================================
+   LumberCorp 2.0 — the next-gen PDA
+   Single-file PWA. No dependencies. Demo-first, live when you add a key.
+   ===================================================================== */
+
+/* ---------- storage ---------- */
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} },
+  del(k){ try{ localStorage.removeItem(k); }catch(e){} }
+};
+
+/* ---------- formatting ---------- */
+const $ = id => document.getElementById(id);
+const fmtInt = n => (n == null || isNaN(Number(n))) ? "—" : Number(n).toLocaleString("en-US");
+function fmtMoney(n){
+  if(n == null || isNaN(Number(n))) return "—";
+  n = Number(n); const abs = Math.abs(n);
+  if(abs >= 1e9) return "$" + (n/1e9).toFixed(2) + "B";
+  if(abs >= 1e6) return "$" + (n/1e6).toFixed(1) + "M";
+  if(abs >= 1e4) return "$" + Math.round(n/1e3) + "K";
+  return "$" + n.toLocaleString("en-US");
+}
+function fmtDur(sec){
+  if(sec == null || isNaN(sec)) return "—";
+  sec = Math.max(0, Math.floor(sec));
+  const d = Math.floor(sec/86400), h = Math.floor(sec%86400/3600), m = Math.floor(sec%3600/60), s = sec%60;
+  if(d > 0) return d + "d " + h + "h";
+  if(h > 0) return h + "h " + m + "m";
+  if(m > 0) return m + "m " + (s > 0 ? s + "s" : "");
+  return s + "s";
+}
+/* always shows seconds — used for live countdowns (flights) */
+function fmtCountdown(sec){
+  if(sec == null || isNaN(sec)) return "—";
+  sec = Math.max(0, Math.floor(sec));
+  const h = Math.floor(sec/3600), m = Math.floor(sec%3600/60), s = sec%60;
+  if(h > 0) return h + "h " + String(m).padStart(2,"0") + "m " + String(s).padStart(2,"0") + "s";
+  if(m > 0) return m + "m " + String(s).padStart(2,"0") + "s";
+  return s + "s";
+}
+function fmtClock(ms){
+  const d = new Date(ms);
+  return d.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
+}
+function timeAgo(ts){
+  if(!ts) return "never";
+  const s = Math.max(0, Math.floor((Date.now() - ts)/1000));
+  if(s < 5) return "just now";
+  if(s < 60) return s + "s ago";
+  return fmtDur(s) + " ago";
+}
+function escHtml(s){
+  return String(s == null ? "" : s).replace(/[&<>"']/g, c =>
+    ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function flagEmoji(cc){
+  if(!cc || cc.length !== 2) return "\u{1F3F3}\uFE0F";
+  return String.fromCodePoint(...[...cc.toUpperCase()].map(c => 0x1F1E6 + c.charCodeAt(0) - 65));
+}
+
+/* ---------- settings ---------- */
+const DEFAULT_SETTINGS = {
+  mode: "demo", apiKey: "", refresh: 60,
+  theme: "dark", accent: "amber",
+  notifEnergy: true, notifFlight: true, notifCooldown: true,
+  customActions: []
+};
+let settings = Object.assign({}, DEFAULT_SETTINGS, store.get("lc2_settings", {}));
+
+function saveSettings(){ store.set("lc2_settings", settings); }
+function applyAppearance(){
+  document.documentElement.dataset.theme = settings.theme;
+  document.documentElement.dataset.accent = settings.accent;
+  document.querySelector('meta[name="theme-color"]').content = settings.theme === "dark" ? "#0d0b08" : "#f4efe4";
+  $("btnTheme").textContent = settings.theme === "dark" ? "🌙" : "☀️";
+}
+
+/* ---------- static data ---------- */
+const DEFAULT_ACTIONS = [
+  {name:"Crimes",  url:"https://www.torn.com/crimes.php",          icon:"🔪"},
+  {name:"Gym",     url:"https://www.torn.com/gym.php",             icon:"🏋️"},
+  {name:"Items",   url:"https://www.torn.com/item.php",            icon:"🎒"},
+  {name:"City",    url:"https://www.torn.com/city.php",            icon:"🏙️"},
+  {name:"Flight",  url:"https://www.torn.com/page.php?sid=travel", icon:"✈️"},
+  {name:"Bazaar",  url:"https://www.torn.com/bazaar.php",          icon:"🛒"},
+  {name:"Faction", url:"https://www.torn.com/factions.php",        icon:"🏰"},
+  {name:"Stocks",  url:"https://www.torn.com/stockexchange.php",   icon:"📈"},
+  {name:"Points",  url:"https://www.torn.com/points.php",          icon:"💎"},
+  {name:"Casino",  url:"https://www.torn.com/casino.php",          icon:"🎰"},
+  {name:"Messages",url:"https://www.torn.com/messages.php",        icon:"✉️"},
+  {name:"Events",  url:"https://www.torn.com/events.php",          icon:"📅"}
+];
+
+const STAT_DEFS = [
+  {key:"attackswon", label:"Attacks Won", icon:"⚔️"},
+  {key:"attackslost", label:"Attacks Lost", icon:"🛡️"},
+  {key:"attackhits", label:"Attack Hits", icon:"🎯"},
+  {key:"peoplebusted", label:"People Busted", icon:"👮"},
+  {key:"revives", label:"Revives Given", icon:"⛑️"},
+  {key:"drugsused", label:"Drugs Used", icon:"💊"},
+  {key:"bazaarcustomers", label:"Bazaar Customers", icon:"🛒"},
+  {key:"bazaarprofit", label:"Bazaar Profit", icon:"💰", money:true},
+  {key:"itemsfound", label:"Items Found", icon:"🧰"},
+  {key:"cityfinds", label:"City Finds", icon:"📍"},
+  {key:"traveltimes", label:"Flights Taken", icon:"✈️"},
+  {key:"refills", label:"Refills Used", icon:"⚡"},
+  {key:"booksread", label:"Books Read", icon:"📚"},
+  {key:"contractscompleted", label:"Contracts Done", icon:"📜"},
+  {key:"meritsbought", label:"Merits Bought", icon:"🏅"},
+  {key:"mailssent", label:"Mails Sent", icon:"✉️"}
+];
+
+/* Destinations — times are minutes per travel class; cost is the standard ticket */
+const DESTINATIONS = [
+  {country:"Mexico", city:"Ciudad Juarez", flag:"MX",
+    times:{standard:24, airstrip:17, wlt:12, business:7}, cost:6500,
+    items:[{n:"Dahlia Flower", price:300, kind:"flower"}]},
+  {country:"Cayman Islands", city:"George Town", flag:"KY",
+    times:{standard:33, airstrip:23, wlt:17, business:10}, cost:10000,
+    items:[{n:"Banana Orchid", price:4000, kind:"flower"},
+           {n:"Cayman Plushie", price:400, kind:"plushie"},
+           {n:"Trout", price:25000, kind:"other"}]},
+  {country:"Canada", city:"Toronto", flag:"CA",
+    times:{standard:39, airstrip:27, wlt:19, business:12}, cost:9000,
+    items:[{n:"Crocus Flower", price:600, kind:"flower"},
+           {n:"Wolverine Plushie", price:30, kind:"plushie"}]},
+  {country:"Hawaii", city:"Honolulu", flag:"US",
+    times:{standard:127, airstrip:89, wlt:63, business:38}, cost:11000,
+    items:[{n:"Orchid Flower", price:700, kind:"flower"},
+           {n:"Stingray Plushie", price:400, kind:"plushie"}]},
+  {country:"United Kingdom", city:"London", flag:"GB",
+    times:{standard:151, airstrip:106, wlt:75, business:45}, cost:18000,
+    items:[{n:"Nessie Plushie", price:200, kind:"plushie"},
+           {n:"Red Fox Plushie", price:1000, kind:"plushie"},
+           {n:"Heart Flower", price:3000, kind:"flower"}]},
+  {country:"Argentina", city:"Buenos Aires", flag:"AR",
+    times:{standard:158, airstrip:111, wlt:79, business:47}, cost:21000,
+    items:[{n:"Ceibo Flower", price:500, kind:"flower"},
+           {n:"Monkey Plushie", price:400, kind:"plushie"},
+           {n:"Tear Gas", price:2500, kind:"other"}]},
+  {country:"Switzerland", city:"Zurich", flag:"CH",
+    times:{standard:166, airstrip:116, wlt:83, business:50}, cost:27000,
+    items:[{n:"Edelweiss Flower", price:900, kind:"flower"},
+           {n:"Chamois Plushie", price:400, kind:"plushie"},
+           {n:"Flash Grenade", price:4000, kind:"other"}]},
+  {country:"Japan", city:"Tokyo", flag:"JP",
+    times:{standard:213, airstrip:149, wlt:107, business:64}, cost:32000,
+    items:[{n:"Cherry Blossom", price:500, kind:"flower"},
+           {n:"Katana", price:25000, kind:"other"}]},
+  {country:"China", city:"Beijing", flag:"CN",
+    times:{standard:229, airstrip:160, wlt:114, business:69}, cost:35000,
+    items:[{n:"Peony Flower", price:5000, kind:"flower"},
+           {n:"Panda Plushie", price:400, kind:"plushie"}]},
+  {country:"United Arab Emirates", city:"Dubai", flag:"AE",
+    times:{standard:257, airstrip:180, wlt:128, business:77}, cost:32000,
+    items:[{n:"Tribulus Omanense", price:6000, kind:"flower"},
+           {n:"Camel Plushie", price:14000, kind:"plushie"}]},
+  {country:"South Africa", city:"Johannesburg", flag:"ZA",
+    times:{standard:282, airstrip:197, wlt:141, business:85}, cost:40000,
+    items:[{n:"African Violet", price:2000, kind:"flower"},
+           {n:"Lion Plushie", price:400, kind:"plushie"},
+           {n:"Smoke Grenade", price:4500, kind:"other"},
+           {n:"Xanax", price:48000, kind:"drug"}]}
+];
+const CLASS_LABEL = {standard:"Standard", airstrip:"Airstrip", wlt:"WLT", business:"Business"};
+
+const YATA_CODES = {
+  "Mexico":"mex", "Cayman Islands":"cay", "Canada":"can", "Hawaii":"haw",
+  "United Kingdom":"uni", "Argentina":"arg", "Switzerland":"swi", "Japan":"jap",
+  "China":"chi", "United Arab Emirates":"uae", "South Africa":"sou"
+};
+const YATA_URL = "https://yata.yt/api/v1/travel/export/";
+/* Optional aggregator backend (Tier-2 cache / Tier-3 crowd reports).
+   Set to your deployed URL, e.g. "https://lumbercorp-aggregator.onrender.com" */
+const AGGREGATOR_URL = "";
+
+/* ---------- demo data ---------- */
+function demoUser(){
+  return {
+    player_id: 1234567, name: "ShadowReaper", level: 42, rank: "The Punisher",
+    status: { state: "Okay", color: "green", description: "In Torn" },
+    gender: "Male",
+    bars: {
+      energy: { current: 87,  maximum: 150, increment: 5, interval: 300, ticktime: 42 },
+      nerve:  { current: 12,  maximum: 35,  increment: 1, interval: 480, ticktime: 210 },
+      happy:  { current: 418, maximum: 750, increment: 2, interval: 300, ticktime: 88 },
+      life:   { current: 640, maximum: 700, increment: 0, interval: 0,   ticktime: 0 }
+    },
+    cooldowns: { drug: 4380, medical: 0, booster: 21120 },
+    money_onhand: 4382910, points: 231, merits: 42, networth: 184739203,
+    personalstats: {
+      attackswon: 1834, attackslost: 412, attackhits: 5290, peoplebusted: 87,
+      revives: 219, drugsused: 1450, bazaarcustomers: 932, bazaarprofit: 8450000,
+      itemsfound: 1204, cityfinds: 63, traveltimes: 388, refills: 512,
+      booksread: 44, contractscompleted: 96, meritsbought: 18, mailssent: 1023
+    },
+    travel: null
+  };
+}
+function demoFaction(){
+  return { name: "Night Syndicate", tag: "[NS]", respect: 482150, members: 34,
+           leader: "ShadowReaper", age: 312, best_chain: 1542 };
+}
+function demoItems(){
+  return [
+    {id:1,  name:"Xanax",            type:"Drug",    market_value:48000,  buy_price:50000,  sell_price:46000,  icon:"💊"},
+    {id:2,  name:"Ecstasy",          type:"Drug",    market_value:35500,  buy_price:38000,  sell_price:33000,  icon:"💊"},
+    {id:3,  name:"Morphine",         type:"Medical", market_value:12000,  buy_price:13500,  sell_price:11500,  icon:"💉"},
+    {id:4,  name:"First Aid Kit",    type:"Medical", market_value:950,    buy_price:1100,   sell_price:800,    icon:"🩹"},
+    {id:5,  name:"Small First Aid Kit", type:"Medical", market_value:420, buy_price:500,    sell_price:350,    icon:"🩹"},
+    {id:6,  name:"Leather Jacket",   type:"Armor",   market_value:450,    buy_price:500,    sell_price:400,    icon:"🧥"},
+    {id:7,  name:"Body Armor",       type:"Armor",   market_value:8500,   buy_price:9200,   sell_price:7800,   icon:"🦺"},
+    {id:8,  name:"Kevlar Vest",      type:"Armor",   market_value:32000,  buy_price:35000,  sell_price:29000,  icon:"🦺"},
+    {id:9,  name:"Baseball Bat",     type:"Weapon",  market_value:1200,   buy_price:1400,   sell_price:1000,   icon:"🏏"},
+    {id:10, name:"Colt 45",          type:"Weapon",  market_value:15000,  buy_price:16500,  sell_price:13800,  icon:"🔫"},
+    {id:11, name:"Dual Berettas",    type:"Weapon",  market_value:42000,  buy_price:46000,  sell_price:38000,  icon:"🔫"},
+    {id:12, name:"MP5 Navy",         type:"Weapon",  market_value:210000, buy_price:230000, sell_price:195000, icon:"🔫"},
+    {id:13, name:"Laptop",           type:"Other",   market_value:3200,   buy_price:3500,   sell_price:2900,   icon:"💻"},
+    {id:14, name:"Diamond Ring",     type:"Other",   market_value:52000,  buy_price:58000,  sell_price:47000,  icon:"💍"},
+    {id:15, name:"Cessna 172",       type:"Plane",   market_value:920000, buy_price:1000000,sell_price:850000, icon:"🛩️"},
+    {id:16, name:"Ford Mustang",     type:"Car",     market_value:640000, buy_price:700000, sell_price:580000, icon:"🚗"},
+    {id:17, name:"Sniper Rifle",     type:"Weapon",  market_value:540000, buy_price:590000, sell_price:490000, icon:"🎯"},
+    {id:18, name:"Grenade",          type:"Weapon",  market_value:18000,  buy_price:20000,  sell_price:16000,  icon:"💣"},
+    {id:19, name:"Racing Helmet",    type:"Other",   market_value:22000,  buy_price:24000,  sell_price:20000,  icon:"🪖"},
+    {id:20, name:"Feathery Hotel Coupon", type:"Other", market_value:9500, buy_price:10500, sell_price:8500,   icon:"🎟️"},
+    {id:21, name:"LSD",              type:"Drug",    market_value:21000,  buy_price:23000,  sell_price:19000,  icon:"💊"},
+    {id:22, name:"Cannabis",         type:"Drug",    market_value:6800,   buy_price:7500,   sell_price:6100,   icon:"🌿"},
+    {id:23, name:"Energy Drink",     type:"Drug",    market_value:2800,   buy_price:3100,   sell_price:2500,   icon:"🥤"}
+  ];
+}
+
+/* ---------- global state ---------- */
+const state = {
+  page: "dashboard",
+  mode: settings.mode,
+  user: demoUser(),
+  faction: demoFaction(),
+  items: demoItems(),
+  itemCache: null,          // live Torn item DB (id/name/market_value)
+  lastUpdated: 0,
+  statsLoaded: false,
+  notified: { energy:false, flight:false, drug:false, medical:false, booster:false },
+  prevCds: null,
+  activity: store.get("lc2_activity", []),
+  unread: 0,
+  mktView: "db",
+  flight: store.get("lc2_flight", null),  // {dest, cls, depart, arrive, cost}
+  watchlist: store.get("lc2_watchlist", [])
+};
+
+/* ---------- activity log & toasts ---------- */
+function logAct(icon, text, silent){
+  state.activity.unshift({ t: Date.now(), icon, text });
+  state.activity = state.activity.slice(0, 80);
+  store.set("lc2_activity", state.activity);
+  if(!silent && state.page !== "alerts"){
+    state.unread++;
+    renderAlertBadge();
+  }
+  if(state.page === "dashboard") renderActPreview();
+  if(state.page === "alerts") renderActivity();
+}
+function renderAlertBadge(){
+  const n = state.unread;
+  $("alertBadge").hidden = n === 0;
+  $("alertBadgeM").hidden = n === 0;
+  $("alertBadge").textContent = n;
+  $("alertBadgeM").textContent = n;
+}
+function toast(msg, kind){
+  const el = document.createElement("div");
+  el.className = "toast" + (kind ? " " + kind : "");
+  el.innerHTML = msg;
+  $("toasts").appendChild(el);
+  setTimeout(() => { el.classList.add("out"); setTimeout(() => el.remove(), 350); }, 3600);
+}
+
+/* ============================== TORN API ============================== */
+const API = "https://api.torn.com";
+
+function describeApiError(e){
+  if(e.code === 2) return "Incorrect API key.";
+  if(e.code === 5) return "Too many requests — slow down.";
+  if(e.code === 7) return "Key lacks access for this call (needs Limited for stats).";
+  if(e.code === 8) return "IP ban / cooldown — try later.";
+  if(e.code === 9) return "API is currently down.";
+  return e.message || "Unknown API error";
+}
+async function tornFetch(path){
+  let res;
+  try{ res = await fetch(path, { cache: "no-store" }); }
+  catch(e){ const err = new Error("Network error — can't reach Torn"); throw err; }
+  let j = null;
+  try{ j = await res.json(); }catch(e){ throw new Error("Bad JSON from Torn (HTTP " + res.status + ")"); }
+  if(j && j.error){ const err = new Error(j.error.error); err.code = j.error.code; throw err; }
+  return j;
+}
+async function tornUser(selections){
+  const key = (settings.apiKey || "").trim();
+  if(!key) { const e = new Error("No API key set"); e.code = -1; throw e; }
+  return tornFetch(`${API}/user/?selections=${selections}&key=${encodeURIComponent(key)}&comment=lumbercorp2`);
+}
+
+/* Poll live data. Basic bars/cooldowns/profile/money work with any key;
+   personalstats & faction need higher access and fail soft. */
+let liveTimer = null;
+async function loadLive(){
+  if(state.mode !== "live") return;
+  try{
+    const u = await tornUser("bars,cooldowns,profile,money,travel");
+    state.user = Object.assign({}, state.user, u);
+    state.lastUpdated = Date.now();
+  }catch(e){
+    toast("⚠️ " + escHtml(describeApiError(e)), "bad");
+    logAct("⚠️", "Live sync failed: " + describeApiError(e));
+    if(e.code === 2){ settings.mode = "demo"; state.mode = "demo"; saveSettings(); renderMode(); }
+    return;
+  }
+  try{
+    const ps = await tornUser("personalstats");
+    if(ps && ps.personalstats){ state.user.personalstats = ps.personalstats; state.statsLoaded = true; }
+  }catch(e){ state.statsLoaded = false; }
+  try{
+    const f = await tornUser("faction");
+    if(f && f.faction) state.faction = Object.assign({}, state.faction, f.faction);
+  }catch(e){}
+  renderAll();
+  scheduleLive();
+}
+function scheduleLive(){
+  if(liveTimer) clearTimeout(liveTimer);
+  if(state.mode !== "live") return;
+  liveTimer = setTimeout(loadLive, Math.max(30, Number(settings.refresh) || 60) * 1000);
+}
+
+/* ============================== YATA FEED ============================== */
+let yataData = store.get("lc2_yata_cache", null);
+let yataUpdatedAt = store.get("lc2_yata_updated", 0);
+let yataLoading = false;
+let yataStale = false;
+
+async function fetchYata(force){
+  if(yataLoading) return;
+  yataLoading = true;
+  $("btnYata").classList.add("spin");
+  try{
+    const r = await fetch(YATA_URL, { cache: "no-store" });
+    if(!r.ok) throw new Error("HTTP " + r.status);
+    const j = await r.json();
+    if(j && j.stocks){
+      yataData = j; yataUpdatedAt = Date.now(); yataStale = false;
+      store.set("lc2_yata_cache", j);
+      store.set("lc2_yata_updated", yataUpdatedAt);
+    }
+  }catch(e){
+    let got = false;
+    if(AGGREGATOR_URL){
+      try{
+        const r2 = await fetch(AGGREGATOR_URL + "/api/abroad-stock", { cache: "no-store" });
+        if(r2.ok){
+          const a = await r2.json();
+          if(a && a.stocks){ yataData = a; yataUpdatedAt = a.updatedAt || Date.now(); yataStale = !!a.stale; got = true; }
+        }
+      }catch(e2){}
+    }
+    if(!got && force){
+      yataStale = true;
+      if(!yataData) toast("⚠️ Stock feed unreachable & no cache yet.", "warn");
+      else toast("📼 Upstream down — showing last-good stock.", "warn");
+    }
+  }
+  yataLoading = false;
+  $("btnYata").classList.remove("spin");
+  renderYataStatus();
+  if(state.page === "flight") renderDestGrid();
+  if(state.mktView === "abroad" && state.page === "market") renderAbroad();
+}
+function yataFor(country){
+  if(!yataData || !yataData.stocks) return null;
+  return yataData.stocks[YATA_CODES[country]] || null;
+}
+/* Torn restocks abroad markets every 15 minutes (fixed cycle). */
+function restockInfo(){
+  const period = 15 * 60 * 1000;
+  const into = Date.now() % period;
+  return { remain: (period - into) / 1000, pct: (1 - into / period) * 100 };
+}
+</script>
+<script>
+"use strict";
+/* ============================== RENDERERS ============================== */
+const PAGES = {
+  dashboard: ["Dashboard", "Your command center"],
+  flight:    ["Flight", "Plan trips & watch abroad stock"],
+  market:    ["Market", "Item DB & abroad profit"],
+  stats:     ["Stats", "Career & faction"],
+  alerts:    ["Alerts", "Notifications & activity"],
+  settings:  ["Settings", "Make it yours"]
+};
+function goto(page){
+  state.page = page;
+  for(const p of Object.keys(PAGES)){
+    $("page-" + p).hidden = p !== page;
+  }
+  document.querySelectorAll(".navitem").forEach(b => b.classList.toggle("active", b.dataset.page === page));
+  document.querySelectorAll(".tabbar button").forEach(b => b.classList.toggle("active", b.dataset.page === page));
+  $("pageTitle").textContent = PAGES[page][0];
+  $("pageSub").textContent = PAGES[page][1];
+  if(page === "alerts"){ state.unread = 0; renderAlertBadge(); renderActivity(); }
+  if(page === "flight"){ renderPlanner(); renderActiveFlight(); renderDestGrid(); renderYataStatus(); }
+  if(page === "market"){ renderMarket(); renderAbroad(); }
+  if(page === "stats"){ renderStats(); }
+  if(page === "settings"){ renderSettings(); }
+  renderAll(); // cheap refresh of dynamic bits for the new page
+  window.scrollTo({ top: 0 });
+}
+
+function actionsList(){
+  return DEFAULT_ACTIONS.concat(settings.customActions || []);
+}
+
+/* ---------- dashboard ---------- */
+function renderDashboard(){
+  const u = state.user;
+  $("idAvatar").textContent = (u.name || "?").charAt(0).toUpperCase();
+  $("idName").textContent = u.name || "—";
+  $("idTag").textContent = (state.faction && state.faction.tag) ? state.faction.tag : "—";
+  $("idLevel").textContent = "Level " + (u.level ?? "—");
+  $("idRank").textContent = u.rank || "—";
+  const st = u.status || {};
+  $("idStatus").textContent = st.description || st.state || "—";
+  $("idStatusDot").style.background =
+    st.color === "green" ? "var(--ok)" : st.color === "red" ? "var(--bad)" :
+    st.color === "orange" ? "var(--warn)" : "var(--info)";
+  $("idMoney").textContent = fmtMoney(u.money_onhand);
+  $("idNet").textContent = fmtMoney(u.networth);
+  $("idPoints").textContent = fmtInt(u.points);
+  renderBars(); renderActions(); renderCooldowns(); renderFlightMini(); renderActPreview();
+}
+function barETA(b){
+  if(!b || b.current >= b.maximum) return 0;
+  if(!b.increment || !b.interval) return null;
+  const need = b.maximum - b.current;
+  const ticks = Math.ceil(need / b.increment);
+  return Math.round((b.ticktime || 0) + (ticks - 1) * b.interval);
+}
+const BAR_META = [
+  ["energy", "⚡ Energy"], ["nerve", "🎯 Nerve"], ["happy", "😀 Happy"], ["life", "❤️ Life"]
+];
+function renderBars(){
+  $("barsWrap").innerHTML = BAR_META.map(([k, lbl]) => {
+    const b = state.user.bars && state.user.bars[k];
+    if(!b) return "";
+    const pct = Math.max(0, Math.min(100, (b.current / b.maximum) * 100));
+    const eta = barETA(b);
+    const etaTxt = eta == null ? "no regen" : (pct >= 100 ? "full" : "full in " + fmtDur(eta));
+    return `<div class="card barcard">
+      <div class="top"><span class="lbl">${lbl}</span><span class="eta">${etaTxt}</span></div>
+      <div class="v"><span class="bar-cur" data-bar="${k}">${fmtInt(b.current)}</span>
+        <small>/ ${fmtInt(b.maximum)} <span class="bar-tick" data-tick="${k}"></span></small></div>
+      <div class="track"><div class="fill ${k}" data-fill="${k}" style="width:${pct}%"></div></div>
+    </div>`;
+  }).join("");
+}
+function renderActions(){
+  const list = actionsList();
+  const customSet = new Set((settings.customActions || []).map(a => a.url));
+  $("actionsWrap").innerHTML = list.map((a, i) => `
+    <a class="act" href="${escHtml(a.url)}" target="_blank" rel="noopener">
+      ${customSet.has(a.url) ? `<button class="rm" data-rmact="${escHtml(a.url)}" title="Remove">✕</button>` : ""}
+      <span class="ai">${a.icon || "🔗"}</span><span class="an">${escHtml(a.name)}</span>
+    </a>`).join("") + `
+    <button class="act add" id="btnAddQuick"><span class="ai">＋</span><span class="an">Add</span></button>`;
+  $("actionsWrap").querySelectorAll("[data-rmact]").forEach(b => {
+    b.addEventListener("click", e => {
+      e.preventDefault(); e.stopPropagation();
+      settings.customActions = settings.customActions.filter(a => a.url !== b.dataset.rmact);
+      saveSettings(); renderActions(); renderActionsMgr();
+      toast("Removed action", "ok");
+    });
+  });
+  $("btnAddQuick").addEventListener("click", () => goto("settings"));
+}
+
+/* ---------- cooldowns ---------- */
+const CD_META = [["drug","💊 Drug"],["medical","🩹 Medical"],["booster","🧪 Booster"]];
+function renderCooldowns(){
+  const cds = state.user.cooldowns || {};
+  $("cdsWrap").innerHTML = CD_META.map(([k, lbl]) => {
+    const v = cds[k] || 0;
+    return `<div class="card cdcard ${v <= 0 ? "ready" : ""}" data-cd="${k}">
+      <span class="ci">${lbl.split(" ")[0]}</span>
+      <div><div class="cl">${lbl.split(" ")[1]}</div>
+      <div class="cv" data-cdv="${k}">${v > 0 ? fmtDur(v) : "Ready ✓"}</div></div>
+    </div>`;
+  }).join("");
+}
+
+/* ---------- flight ---------- */
+function renderFlightMini(){
+  const box = $("flightMini");
+  if(state.flight){
+    const d = DESTINATIONS.find(x => x.country === state.flight.dest);
+    const left = Math.floor((state.flight.arrive - Date.now()) / 1000);
+    const landed = left <= 0;
+    box.innerHTML = `<div class="card flightmini">
+      <span class="fi">${d ? flagEmoji(d.flag) : "✈️"}</span>
+      <div>
+        <div class="ft">${landed ? "Landed in" : "Flying to"} ${escHtml(state.flight.dest)} · ${CLASS_LABEL[state.flight.cls] || ""}</div>
+        <div class="fs">${landed ? "Welcome abroad — stock is waiting" : "Departed " + fmtClock(state.flight.depart) + " · arrives " + fmtClock(state.flight.arrive)}</div>
+      </div>
+      <div class="fc"><b class="num" id="flightMiniCd">${landed ? "LANDED" : fmtDur(left)}</b></div>
+    </div>`;
+  } else {
+    box.innerHTML = `<div class="card flightmini">
+      <span class="fi">🛫</span>
+      <div><div class="ft">No active flight</div>
+      <div class="fs">Plan one below or from the Flight tab</div></div>
+      <span class="spacer"></span>
+      <button class="btn sm primary" id="miniPlanBtn">Plan ✈️</button>
+    </div>`;
+    $("miniPlanBtn").addEventListener("click", () => goto("flight"));
+  }
+}
+function renderPlanner(){
+  const sel = $("planDest");
+  sel.innerHTML = DESTINATIONS.map(d =>
+    `<option value="${escHtml(d.country)}">${flagEmoji(d.flag)} ${escHtml(d.country)} — ${escHtml(d.city)}</option>`).join("");
+  renderPlanInfo();
+}
+function renderPlanInfo(){
+  const d = DESTINATIONS.find(x => x.country === $("planDest").value) || DESTINATIONS[0];
+  const cls = $("planClass").value;
+  const mins = d.times[cls] ?? d.times.standard;
+  const depart = Date.now(), arrive = depart + mins * 60000;
+  const roundTicket = d.cost * 2;
+  $("planInfo").innerHTML = `
+    <span>Flight time <b>${fmtDur(mins * 60)}</b></span>
+    <span>Ticket <b>${fmtTicket$(d.cost)}</b></span>
+    <span>Return ticket <b>${fmtTicket$(roundTicket)}</b></span>
+    <span>Arrive <b>${fmtClock(arrive)}</b></span>
+    <span>Back (same class) <b>${fmtClock(arrive + mins * 60000 * 2)}</b></span>`;
+}
+/* small local helper so tickets always render in full dollars */
+function fmtTicket$(n){ return "$" + Number(n).toLocaleString("en-US"); }
+
+function beginFlight(){
+  if(state.flight && state.flight.arrive > Date.now()){
+    toast("✈️ You're already flying. Cancel first.", "warn"); return;
+  }
+  const d = DESTINATIONS.find(x => x.country === $("planDest").value) || DESTINATIONS[0];
+  const cls = $("planClass").value;
+  const mins = d.times[cls] ?? d.times.standard;
+  state.flight = {
+    dest: d.country, cls, depart: Date.now(), arrive: Date.now() + mins * 60000, cost: d.cost
+  };
+  store.set("lc2_flight", state.flight);
+  state.notified.flight = false;
+  logAct("🛫", `Flight begun: ${d.country} (${CLASS_LABEL[cls]}, ${fmtDur(mins * 60)})`);
+  toast(`🛫 Wheels up — ${d.country} in ${fmtDur(mins * 60)}`, "ok");
+  renderActiveFlight(); renderFlightMini();
+}
+function cancelFlight(){
+  if(!state.flight) return;
+  logAct("🛬", `Flight to ${state.flight.dest} cancelled/removed`);
+  state.flight = null; store.del("lc2_flight");
+  renderActiveFlight(); renderFlightMini();
+}
+function renderActiveFlight(){
+  const box = $("activeFlightBox");
+  if(!state.flight){ box.innerHTML = ""; $("planGo").hidden = false; $("planCancel").hidden = true; return; }
+  const d = DESTINATIONS.find(x => x.country === state.flight.dest);
+  const left = Math.floor((state.flight.arrive - Date.now()) / 1000);
+  const total = Math.max(1, Math.floor((state.flight.arrive - state.flight.depart) / 1000));
+  const pct = Math.max(0, Math.min(100, (1 - Math.max(0, left) / total) * 100));
+  const landed = left <= 0;
+  $("planGo").hidden = !landed;
+  $("planCancel").hidden = false;
+  box.innerHTML = `<h2 class="sec">Active Flight</h2>
+    <div class="card plan" style="gap:9px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <span style="font-size:28px">${d ? flagEmoji(d.flag) : "✈️"}</span>
+        <div>
+          <div style="font-weight:800;font-size:15px">${landed ? "Landed in" : "En route to"} ${escHtml(state.flight.dest)} <span class="chip">${CLASS_LABEL[state.flight.cls]}</span></div>
+          <div style="font-size:12px;color:var(--muted)" class="num">${fmtClock(state.flight.depart)} → ${fmtClock(state.flight.arrive)} · ticket ${fmtTicket$(state.flight.cost)}</div>
+        </div>
+        <span class="spacer"></span>
+        <b style="font-size:20px" class="num" id="activeCd">${landed ? "LANDED" : fmtDur(left)}</b>
+      </div>
+      <div class="track"><div class="fill restockfill" style="width:${pct}%"></div></div>
+    </div>`;
+}
+
+/* ---------- abroad stock / destinations ---------- */
+function renderYataStatus(){
+  const el = $("yataStatus");
+  if(!yataData){ el.className = "chip warn"; el.textContent = "no stock data yet"; return; }
+  if(yataStale){ el.className = "chip warn"; el.textContent = "📼 stale · last good " + timeAgo(yataUpdatedAt); }
+  else { el.className = "chip ok"; el.textContent = "🟢 live feed · " + timeAgo(yataUpdatedAt); }
+}
+function renderRestock(){
+  const r = restockInfo();
+  const bar = $("restockBar"), txt = $("restockTxt");
+  if(bar) bar.style.width = r.pct.toFixed(1) + "%";
+  if(txt) txt.textContent = "restocks in " + fmtDur(r.remain);
+}
+function renderDestGrid(){
+  const grid = $("destGrid");
+  grid.innerHTML = DESTINATIONS.map(d => {
+    const soonest = Math.min(...Object.values(d.times));
+    const y = yataFor(d.country);
+    let chips = d.items.slice(0, 3).map(it => {
+      let qty = null;
+      if(y && y.stocks){
+        const match = Object.entries(y.stocks).find(([name]) => name.toLowerCase() === it.n.toLowerCase());
+        if(match) qty = match[1].quantity;
+      }
+      return `<span class="itemchip">${escHtml(it.n)} ${qty == null ? "" : (qty > 0 ? "<b>×" + qty + "</b>" : '<span class="zero">×0</span>')}</span>`;
+    }).join("");
+    const more = d.items.length > 3 ? `<span class="itemchip">+${d.items.length - 3} more</span>` : "";
+    return `<div class="card dest" data-dest="${escHtml(d.country)}">
+      <div class="dhead">
+        <span class="fl">${flagEmoji(d.flag)}</span>
+        <div><div class="dc">${escHtml(d.country)}</div><div class="dy">${escHtml(d.city)}</div></div>
+        <span class="dtime">✈ ${fmtDur(soonest * 60)}</span>
+      </div>
+      <div class="ditems">${chips}${more}</div>
+    </div>`;
+  }).join("");
+  grid.querySelectorAll("[data-dest]").forEach(el =>
+    el.addEventListener("click", () => openStockSheet(el.dataset.dest)));
+}
+function itemMarketValue(name){
+  const pool = state.itemCache || state.items || [];
+  const norm = s => (s || "").toLowerCase().trim();
+  const n = norm(name);
+  for(const it of pool){ if(norm(it.name) === n && Number(it.market_value) > 0) return Number(it.market_value); }
+  return null;
+}
+function openStockSheet(country){
+  const d = DESTINATIONS.find(x => x.country === country);
+  if(!d) return;
+  const y = yataFor(country);
+  $("sheetFlag").textContent = flagEmoji(d.flag);
+  $("sheetTitle").textContent = d.country + " — " + d.city;
+  const upd = y && y.update ? new Date(y.update * 1000).toLocaleString() : null;
+  $("sheetSub").textContent = y
+    ? (upd ? "feed updated " + upd + (yataStale ? " · stale" : "") : "abroad stock")
+    : "no feed data for this country yet";
+  let rows = d.items.map(it => {
+    let qty = null, cost = it.price;
+    if(y && y.stocks){
+      const match = Object.entries(y.stocks).find(([name]) => name.toLowerCase() === it.n.toLowerCase());
+      if(match){ qty = match[1].quantity; if(match[1].cost) cost = match[1].cost; }
+    }
+    const mkt = itemMarketValue(it.n);
+    const profit = mkt != null ? mkt - cost : null;
+    return { it, qty, cost, mkt, profit };
+  });
+  rows.sort((a, b) => (b.profit ?? -1e12) - (a.profit ?? -1e12));
+  $("sheetBody").innerHTML = `
+    <div class="card tblwrap"><table class="tbl">
+      <thead><tr><th>Item</th><th class="r">Qty</th><th class="r">Shop</th><th class="r">Market</th><th class="r">Profit/u</th></tr></thead>
+      <tbody>${rows.map(r => `
+        <tr style="${r.qty === 0 ? "opacity:.45" : ""}">
+          <td>${escHtml(r.it.n)} <span class="chip" style="font-size:9.5px;padding:1px 6px">${r.it.kind}</span></td>
+          <td class="r">${r.qty == null ? "—" : fmtInt(r.qty)}</td>
+          <td class="r">${fmtMoney(r.cost)}</td>
+          <td class="r">${r.mkt != null ? fmtMoney(r.mkt) : "—"}</td>
+          <td class="r">${r.profit != null ? `<span class="${r.profit >= 0 ? "profit-up" : "profit-down"}">${r.profit >= 0 ? "+" : ""}${fmtMoney(r.profit)}</span>` : "—"}</td>
+        </tr>`).join("")}
+      </tbody>
+    </table></div>
+    ${y ? "" : '<div class="empty" style="margin-top:12px">No YATA data for this country. Hit ⟳ on the Flight tab.</div>'}`;
+  $("stockOverlay").classList.add("open");
+}
+
+/* ---------- market ---------- */
+function renderMarket(){
+  const q = ($("mktSearch").value || "").toLowerCase();
+  const type = $("mktType").value;
+  const sort = $("mktSort").value;
+  let list = (state.itemCache || state.items).slice();
+  if(q) list = list.filter(i => i.name.toLowerCase().includes(q));
+  if(type) list = list.filter(i => i.type === type);
+  if(sort === "value") list.sort((a, b) => (b.market_value || 0) - (a.market_value || 0));
+  else if(sort === "spread"){
+    list.sort((a, b) => flipPct(b) - flipPct(a));
+  } else list.sort((a, b) => a.name.localeCompare(b.name));
+  $("mktList").innerHTML = list.map(i => {
+    const wl = state.watchlist.includes(i.id);
+    const sp = flipPct(i);
+    return `<div class="irow">
+      <button class="star ${wl ? "on" : ""}" data-star="${i.id}" title="Watchlist">${wl ? "★" : "☆"}</button>
+      <span class="ii">${i.icon || "📦"}</span>
+      <div class="im"><div class="in">${escHtml(i.name)}</div><div class="it">${escHtml(i.type)} · #${i.id}</div></div>
+      <span class="spread ${sp >= 0 ? "up" : "down"}">${sp >= 0 ? "+" : ""}${sp.toFixed(1)}% flip</span>
+      <div class="ip">${fmtMoney(i.market_value)}<small>buy ${fmtMoney(i.buy_price)} · sell ${fmtMoney(i.sell_price)}</small></div>
+    </div>`;
+  }).join("") || `<div class="empty">No items match.</div>`;
+  $("mktList").querySelectorAll("[data-star]").forEach(b => {
+    b.addEventListener("click", () => {
+      const id = Number(b.dataset.star);
+      const idx = state.watchlist.indexOf(id);
+      if(idx >= 0) state.watchlist.splice(idx, 1); else state.watchlist.push(id);
+      store.set("lc2_watchlist", state.watchlist);
+      renderMarket();
+    });
+  });
+}
+function flipPct(i){
+  if(!i.buy_price || !i.market_value) return -100;
+  return ((i.sell_price || i.market_value) - i.buy_price) / i.buy_price * 100;
+}
+function renderAbroad(){
+  const sel = $("abroadCountry");
+  if(!sel.options.length){
+    sel.innerHTML = DESTINATIONS.map(d =>
+      `<option value="${escHtml(d.country)}">${flagEmoji(d.flag)} ${escHtml(d.country)}</option>`).join("");
+  }
+  const country = sel.value || DESTINATIONS[0].country;
+  const d = DESTINATIONS.find(x => x.country === country);
+  const y = yataFor(country);
+  let rows = d.items.map(it => {
+    let qty = null, cost = it.price;
+    if(y && y.stocks){
+      const m = Object.entries(y.stocks).find(([n]) => n.toLowerCase() === it.n.toLowerCase());
+      if(m){ qty = m[1].quantity; if(m[1].cost) cost = m[1].cost; }
+    }
+    const mkt = itemMarketValue(it.n);
+    return { it, qty, cost, mkt, profit: mkt != null ? mkt - cost : null,
+             total: (mkt != null && qty) ? (mkt - cost) * qty : null };
+  });
+  rows.sort((a, b) => (b.profit ?? -1e12) - (a.profit ?? -1e12));
+  $("abroadTable").innerHTML = `
+    <thead><tr><th>Item</th><th class="r">Qty</th><th class="r">Shop</th><th class="r">Market</th><th class="r">Profit/u</th><th class="r">Total if cleared</th></tr></thead>
+    <tbody>${rows.map(r => `
+      <tr style="${r.qty === 0 ? "opacity:.45" : ""}">
+        <td style="font-weight:700">${escHtml(r.it.n)}</td>
+        <td class="r">${r.qty == null ? "—" : fmtInt(r.qty)}</td>
+        <td class="r">${fmtMoney(r.cost)}</td>
+        <td class="r">${r.mkt != null ? fmtMoney(r.mkt) : "—"}</td>
+        <td class="r">${r.profit != null ? `<span class="${r.profit >= 0 ? "profit-up" : "profit-down"}">${r.profit >= 0 ? "+" : ""}${fmtMoney(r.profit)}</span>` : "—"}</td>
+        <td class="r">${r.total != null ? fmtMoney(r.total) : "—"}</td>
+      </tr>`).join("")}
+    </tbody>`;
+}
+
+/* ---------- stats ---------- */
+function renderStats(){
+  const f = state.faction || {};
+  $("factionBox").innerHTML = `<div class="card faction">
+    <div class="femblem">🏰</div>
+    <div><div class="fname">${escHtml(f.name || "—")} <span class="chip accent">${escHtml(f.tag || "")}</span></div>
+    <div class="fsub">Led by ${escHtml(f.leader || "—")} · ${fmtInt(f.age)} days old</div></div>
+    <div class="fstats">
+      <div><small>Respect</small><b>${fmtInt(f.respect)}</b></div>
+      <div><small>Members</small><b>${fmtInt(f.members)}</b></div>
+      <div><small>Best chain</small><b>${fmtInt(f.best_chain)}</b></div>
+    </div>
+  </div>`;
+  const ps = state.user.personalstats || {};
+  $("statsGrid").innerHTML = STAT_DEFS.map(s => `
+    <div class="card stat"><div class="sl">${s.icon} ${s.label}</div>
+    <div class="sv">${s.money ? fmtMoney(ps[s.key]) : fmtInt(ps[s.key])}</div></div>`).join("");
+  $("statsUpdated").textContent = state.mode === "live"
+    ? (state.statsLoaded ? "personalstats loaded (Limited+ key)" : "personalstats need a Limited+ API key — showing what we have")
+    : "demo data — add a Torn API key in Settings for your real numbers";
+}
+
+/* ---------- alerts ---------- */
+function renderActivity(){
+  const box = $("actList");
+  if(!state.activity.length){ box.innerHTML = `<div class="empty">Nothing yet — fly somewhere, sync live data, or trigger an alert.</div>`; return; }
+  box.innerHTML = state.activity.map(a => `
+    <div class="fitem"><span class="fico">${a.icon}</span>
+    <div><div class="ftx">${escHtml(a.text)}</div><div class="ftm">${timeAgo(a.t)}</div></div></div>`).join("");
+}
+function renderActPreview(){
+  const box = $("actPreview");
+  const last = state.activity.slice(0, 3);
+  box.innerHTML = last.length ? last.map(a => `
+    <div class="fitem"><span class="fico">${a.icon}</span>
+    <div><div class="ftx">${escHtml(a.text)}</div><div class="ftm">${timeAgo(a.t)}</div></div></div>`).join("")
+    : `<div class="empty">Quiet so far.</div>`;
+}
+
+/* ---------- settings ---------- */
+const ACCENTS = [["amber","#f5a524"],["ember","#ff6b4a"],["jade","#2fbf71"],["violet","#8b5cf6"],["ice","#38bdf8"]];
+function renderSettings(){
+  document.querySelectorAll("[data-mode]").forEach(b => b.classList.toggle("active", b.dataset.mode === settings.mode));
+  document.querySelectorAll("[data-theme-val]").forEach(b => b.classList.toggle("active", b.dataset.theme_val === settings.theme || b.dataset.themeVal === settings.theme));
+  $("setKey").value = settings.apiKey || "";
+  $("setRefresh").value = String(settings.refresh);
+  $("tglEnergy").checked = !!settings.notifEnergy;
+  $("tglFlight").checked = !!settings.notifFlight;
+  $("tglCooldown").checked = !!settings.notifCooldown;
+  $("accentRow").innerHTML = ACCENTS.map(([name, col]) =>
+    `<div class="swatch ${settings.accent === name ? "sel" : ""}" data-accent-pick="${name}" style="background:${col}" title="${name}"></div>`).join("");
+  $("accentRow").querySelectorAll("[data-accent-pick]").forEach(el => {
+    el.addEventListener("click", () => {
+      settings.accent = el.dataset.accentPick; saveSettings(); applyAppearance(); renderSettings();
+      toast("Accent: " + el.dataset.accentPick, "ok");
+    });
+  });
+  renderActionsMgr();
+  renderNotifState();
+}
+function renderActionsMgr(){
+  $("actionsMgr").innerHTML = actionsList().map(a => {
+    const isCustom = (settings.customActions || []).some(c => c.url === a.url);
+    return `<div class="setrow" style="padding:7px 10px;background:var(--card2);border:1px solid var(--border);border-radius:10px">
+      <span>${a.icon || "🔗"}</span><span class="st" style="font-size:13px">${escHtml(a.name)}</span>
+      <span style="flex:1;min-width:80px;font-size:11.5px;color:var(--faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(a.url.replace("https://www.torn.com",""))}</span>
+      ${isCustom ? `<button class="btn sm danger" data-delact="${escHtml(a.url)}">Remove</button>` : `<span class="chip">built-in</span>`}
+    </div>`;
+  }).join("");
+  $("actionsMgr").querySelectorAll("[data-delact]").forEach(b =>
+    b.addEventListener("click", () => {
+      settings.customActions = settings.customActions.filter(a => a.url !== b.dataset.delact);
+      saveSettings(); renderActionsMgr(); renderActions();
+    }));
+}
+function renderMode(){
+  const live = state.mode === "live";
+  $("modeBadge").classList.toggle("live", live);
+  $("modeBadgeTxt").textContent = live ? "LIVE · TORN API" : "DEMO MODE";
+  $("btnRefresh").classList.toggle("spin", false);
+}
+function renderAll(){
+  renderDashboard();
+  if(state.page === "flight"){ renderActiveFlight(); renderDestGrid(); renderYataStatus(); }
+  if(state.page === "market"){ renderMarket(); renderAbroad(); }
+  if(state.page === "stats") renderStats();
+  renderMode();
+}
+
+/* ============================== TICKER ============================== */
+/* Advance bars client-side each second (works for demo & between live polls). */
+function simTick(dt){
+  const bars = state.user.bars;
+  if(!bars) return;
+  for(const k of ["energy","nerve","happy"]){
+    const b = bars[k];
+    if(!b || !b.increment || !b.interval) continue;
+    if(b.current >= b.maximum){ b.ticktime = b.ticktime || 0; continue; }
+    b.ticktime -= dt;
+    let guard = 0;
+    while(b.ticktime <= 0 && guard++ < 100){
+      b.ticktime += b.interval;
+      b.current = Math.min(b.maximum, b.current + b.increment);
+    }
+  }
+}
+function updateDynamic(){
+  // bars
+  const bars = state.user.bars || {};
+  for(const [k] of BAR_META){
+    const b = bars[k]; if(!b) continue;
+    const cur = document.querySelector(`[data-bar="${k}"]`);
+    const fill = document.querySelector(`[data-fill="${k}"]`);
+    const tick = document.querySelector(`[data-tick="${k}"]`);
+    if(cur) cur.textContent = fmtInt(b.current);
+    if(fill) fill.style.width = Math.max(0, Math.min(100, b.current / b.maximum * 100)) + "%";
+    const eta = barETA(b);
+    if(tick) tick.textContent = (eta != null && b.current < b.maximum) ? "· +" + fmtDur(eta) : "";
+    const card = fill && fill.closest(".barcard");
+    if(card){
+      const etaEl = card.querySelector(".eta");
+      if(etaEl) etaEl.textContent = eta == null ? "no regen" : (b.current >= b.maximum ? "full ✓" : "full in " + fmtDur(eta));
+    }
+  }
+  // cooldowns
+  const cds = state.user.cooldowns || {};
+  for(const [k] of CD_META){
+    const v = Math.max(0, (cds[k] || 0) - 1);
+    cds[k] = v;
+    const el = document.querySelector(`[data-cdv="${k}"]`);
+    if(el){
+      el.textContent = v > 0 ? fmtDur(v) : "Ready ✓";
+      el.closest(".cdcard").classList.toggle("ready", v <= 0);
+    }
+  }
+  state.user.cooldowns = cds;
+  // flight countdowns
+  if(state.flight){
+    const left = Math.floor((state.flight.arrive - Date.now()) / 1000);
+    const landed = left <= 0;
+    const mini = $("flightMiniCd"); if(mini) mini.textContent = landed ? "LANDED" : fmtCountdown(left);
+    const act = $("activeCd"); if(act) act.textContent = landed ? "LANDED" : fmtCountdown(left);
+    if(landed && !state.notified.flight){
+      state.notified.flight = true;
+      logAct("🛬", `Landed in ${state.flight.dest} — markets restocked, go shopping`);
+      toast(`🛬 Landed in ${escHtml(state.flight.dest)}!`, "ok");
+      notify("LumberCorp 2.0", `✈️ Landed in ${state.flight.dest} — check the stock.`);
+      renderFlightMini();
+    }
+  }
+  renderRestock();
+  // clocks
+  const nowTorn = new Intl.DateTimeFormat("en-GB", { timeZone: "Etc/GMT+5", hour:"2-digit", minute:"2-digit", second:"2-digit" }).format(new Date());
+  $("clockTorn").textContent = nowTorn + " TCT";
+  $("clockLocal").textContent = new Date().toLocaleTimeString();
+  if($("dashUpdated")) $("dashUpdated").textContent =
+    `${state.mode === "live" ? "live" : "demo"} data · updated ${timeAgo(state.lastUpdated)}${yataData ? " · stock feed " + timeAgo(yataUpdatedAt) : ""}`;
+}
+
+/* ============================== NOTIFICATIONS ============================== */
+function notifPerm(){
+  if(!("Notification" in window)) return "unsupported";
+  return Notification.permission;
+}
+function renderNotifState(){
+  const p = notifPerm();
+  $("notifState").textContent =
+    p === "granted" ? "Enabled — you'll get pings even when the tab is hidden" :
+    p === "denied" ? "Blocked in browser settings" :
+    p === "unsupported" ? "Not supported by this browser" : "Not enabled yet";
+  $("btnNotifPerm").hidden = p === "granted" || p === "denied" || p === "unsupported";
+}
+function notify(title, body){
+  if(notifPerm() !== "granted") return;
+  try{ new Notification(title, { body, icon: "icons/icon-192.png" }); }catch(e){}
+}
+function checkAlerts(){
+  // energy full
+  const e = state.user.bars && state.user.bars.energy;
+  if(e){
+    if(e.current >= e.maximum && !state.notified.energy){
+      state.notified.energy = true;
+      if(settings.notifEnergy){
+        logAct("⚡", "Energy bar is FULL");
+        toast("⚡ Energy full — go spend it!", "ok");
+        notify("LumberCorp 2.0", "⚡ Energy bar is full.");
+      }
+    }
+    if(e.current < e.maximum) state.notified.energy = false;
+  }
+  // cooldowns crossing zero
+  const cds = state.user.cooldowns || {};
+  if(state.prevCds){
+    for(const k of ["drug","medical","booster"]){
+      if(state.prevCds[k] > 0 && cds[k] === 0 && settings.notifCooldown && !state.notified[k]){
+        state.notified[k] = true;
+        const label = { drug:"Drug", medical:"Medical", booster:"Booster" }[k];
+        logAct("⏱️", label + " cooldown finished");
+        toast(`⏱️ ${label} cooldown finished`, "ok");
+        notify("LumberCorp 2.0", `⏱️ ${label} cooldown finished.`);
+      }
+      if(cds[k] > 0) state.notified[k] = false;
+    }
+  }
+  state.prevCds = Object.assign({}, cds);
+}
+
+/* ============================== COMMAND PALETTE ============================== */
+let palSel = 0, palItems = [];
+function palSources(){
+  const out = [];
+  for(const p of Object.keys(PAGES)) out.push({ icon: PAGES[p] ? "" : "", title: "Go to " + PAGES[p][0], sub: PAGES[p][1], key: "page", run: () => goto(p) });
+  const pIcons = { dashboard:"⚡", flight:"✈️", market:"💱", stats:"📈", alerts:"🔔", settings:"⚙️" };
+  for(const o of out) o.icon = pIcons[o.title.replace("Go to ", "").toLowerCase()] || "➜";
+  for(const d of DESTINATIONS) out.push({ icon: flagEmoji(d.flag), title: "Fly to " + d.country, sub: d.city + " · fastest " + fmtDur(Math.min(...Object.values(d.times)) * 60), key: "flight", run: () => { goto("flight"); $("planDest").value = d.country; renderPlanInfo(); } });
+  for(const i of (state.itemCache || state.items).slice(0, 40)) out.push({ icon: i.icon || "📦", title: i.name, sub: i.type + " · " + fmtMoney(i.market_value), key: "market", run: () => { goto("market"); $("mktSearch").value = i.name; renderMarket(); } });
+  for(const a of actionsList()) out.push({ icon: a.icon || "🔗", title: "Open " + a.name, sub: "torn.com", key: "link", run: () => window.open(a.url, "_blank") });
+  out.push({ icon: "🌗", title: "Toggle theme", sub: "dark / light", key: "action", run: () => toggleTheme() });
+  out.push({ icon: "🔄", title: "Refresh data now", sub: state.mode + " mode", key: "action", run: () => refreshNow() });
+  return out;
+}
+function openPalette(){
+  $("palOverlay").classList.add("open");
+  $("palInput").value = "";
+  palRender("");
+  setTimeout(() => $("palInput").focus(), 30);
+}
+function closePalette(){ $("palOverlay").classList.remove("open"); }
+function palRender(q){
+  const query = q.trim().toLowerCase();
+  let items = palSources();
+  if(query){
+    items = items.map(it => {
+      const t = it.title.toLowerCase(), s = (it.sub || "").toLowerCase();
+      let score = -1;
+      if(t.startsWith(query)) score = 0;
+      else if(t.includes(query)) score = 1;
+      else if(s.includes(query)) score = 2;
+      return { it, score };
+    }).filter(x => x.score >= 0).sort((a, b) => a.score - b.score).map(x => x.it);
+  }
+  palItems = items.slice(0, 12);
+  palSel = 0;
+  $("palList").innerHTML = palItems.map((it, i) => `
+    <button class="palitem ${i === palSel ? "sel" : ""}" data-pal="${i}">
+      <span class="pi">${it.icon}</span>
+      <span><span class="pt">${escHtml(it.title)}</span><br><span class="ps">${escHtml(it.sub || "")}</span></span>
+      <span class="pk">${it.key}</span>
+    </button>`).join("") || `<div class="empty" style="margin:8px">No matches.</div>`;
+  $("palList").querySelectorAll("[data-pal]").forEach(b =>
+    b.addEventListener("click", () => { closePalette(); palItems[Number(b.dataset.pal)].run(); }));
+}
+function palKey(e){
+  if(e.key === "ArrowDown" || e.key === "ArrowUp"){
+    e.preventDefault();
+    palSel = (palSel + (e.key === "ArrowDown" ? 1 : -1) + palItems.length) % Math.max(1, palItems.length);
+    $("palList").querySelectorAll(".palitem").forEach((el, i) => el.classList.toggle("sel", i === palSel));
+    const selEl = $("palList").querySelector(".palitem.sel");
+    if(selEl) selEl.scrollIntoView({ block: "nearest" });
+  } else if(e.key === "Enter"){
+    e.preventDefault();
+    if(palItems[palSel]){ closePalette(); palItems[palSel].run(); }
+  } else if(e.key === "Escape"){ closePalette(); }
+}
+</script>
+<script>
+"use strict";
+/* ============================== EVENTS ============================== */
+function toggleTheme(){
+  settings.theme = settings.theme === "dark" ? "light" : "dark";
+  saveSettings(); applyAppearance();
+  if(state.page === "settings") renderSettings();
+}
+async function refreshNow(){
+  $("btnRefresh").classList.add("spin");
+  if(state.mode === "live"){ await loadLive(); }
+  else { state.lastUpdated = Date.now(); toast("🔄 Demo data refreshed", "ok"); }
+  fetchYata(true);
+  $("btnRefresh").classList.remove("spin");
+}
+function wire(){
+  document.querySelectorAll(".navitem, .tabbar button").forEach(b =>
+    b.addEventListener("click", () => goto(b.dataset.page)));
+  $("btnTheme").addEventListener("click", toggleTheme);
+  $("btnRefresh").addEventListener("click", refreshNow);
+  $("btnSearch").addEventListener("click", openPalette);
+  $("modeBadge").addEventListener("click", () => setMode(state.mode === "live" ? "demo" : "live"));
+
+  // palette
+  $("palInput").addEventListener("input", e => palRender(e.target.value));
+  $("palInput").addEventListener("keydown", palKey);
+  $("palOverlay").addEventListener("click", e => { if(e.target === $("palOverlay")) closePalette(); });
+  document.addEventListener("keydown", e => {
+    if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k"){ e.preventDefault(); openPalette(); }
+    else if(e.key === "/" && !/input|textarea|select/i.test(document.activeElement.tagName)){ e.preventDefault(); openPalette(); }
+    else if(e.key === "Escape"){ closePalette(); $("stockOverlay").classList.remove("open"); }
+  });
+
+  // planner
+  $("planDest").addEventListener("change", renderPlanInfo);
+  $("planClass").addEventListener("change", renderPlanInfo);
+  $("planGo").addEventListener("click", beginFlight);
+  $("planCancel").addEventListener("click", cancelFlight);
+
+  // stock
+  $("btnYata").addEventListener("click", () => fetchYata(true));
+  $("sheetClose").addEventListener("click", () => $("stockOverlay").classList.remove("open"));
+  $("stockOverlay").addEventListener("click", e => { if(e.target === $("stockOverlay")) $("stockOverlay").classList.remove("open"); });
+  $("btnReport").addEventListener("click", () => {
+    if(!AGGREGATOR_URL){
+      toast("📣 Crowd reports need the aggregator backend — set <code>AGGREGATOR_URL</code> in the code (see repo README).", "warn");
+    } else {
+      toast("📣 Report form opens in v2.1 — backend detected.", "ok");
+    }
+  });
+
+  // market
+  $("mktSearch").addEventListener("input", renderMarket);
+  $("mktType").addEventListener("change", renderMarket);
+  $("mktSort").addEventListener("change", renderMarket);
+  $("abroadCountry").addEventListener("change", renderAbroad);
+  document.querySelectorAll("[data-mkt]").forEach(b =>
+    b.addEventListener("click", () => {
+      document.querySelectorAll("[data-mkt]").forEach(x => x.classList.toggle("active", x === b));
+      state.mktView = b.dataset.mkt;
+      $("mktList").hidden = state.mktView !== "db";
+      $("abroadWrap").hidden = state.mktView !== "abroad";
+      if(state.mktView === "abroad") renderAbroad(); else renderMarket();
+    }));
+
+  // alerts
+  $("btnNotifPerm").addEventListener("click", async () => {
+    if(notifPerm() === "unsupported"){ toast("⚠️ Notifications unsupported here.", "warn"); return; }
+    const p = await Notification.requestPermission();
+    renderNotifState();
+    toast(p === "granted" ? "🔔 Notifications enabled" : "🔕 Permission " + p, p === "granted" ? "ok" : "warn");
+  });
+  const bindToggle = (id, key) => $(id).addEventListener("change", e => {
+    settings[key] = e.target.checked; saveSettings();
+    toast(e.target.checked ? "Alert on" : "Alert off");
+  });
+  bindToggle("tglEnergy", "notifEnergy");
+  bindToggle("tglFlight", "notifFlight");
+  bindToggle("tglCooldown", "notifCooldown");
+  $("btnClearAct").addEventListener("click", () => {
+    state.activity = []; state.unread = 0; store.set("lc2_activity", []);
+    renderAlertBadge(); renderActivity(); renderActPreview();
+    toast("Activity cleared", "ok");
+  });
+
+  // settings
+  document.querySelectorAll("[data-mode]").forEach(b =>
+    b.addEventListener("click", () => setMode(b.dataset.mode)));
+  $("setKey").addEventListener("change", e => {
+    settings.apiKey = e.target.value.trim(); saveSettings();
+    toast("API key saved", "ok");
+  });
+  $("btnTestKey").addEventListener("click", async () => {
+    settings.apiKey = $("setKey").value.trim(); saveSettings();
+    if(!settings.apiKey){ toast("Paste a key first", "warn"); return; }
+    $("btnTestKey").textContent = "…";
+    try{
+      const u = await tornUser("profile");
+      toast(`✅ Key works — hello ${escHtml(u.name || "player")}`, "ok");
+    }catch(e){
+      toast("⚠️ " + escHtml(describeApiError(e)), "bad");
+    }
+    $("btnTestKey").textContent = "Test";
+  });
+  $("setRefresh").addEventListener("change", e => {
+    settings.refresh = Number(e.target.value); saveSettings(); scheduleLive();
+  });
+  document.querySelectorAll("[data-theme-val]").forEach(b =>
+    b.addEventListener("click", () => {
+      settings.theme = b.dataset.themeVal; saveSettings(); applyAppearance(); renderSettings();
+    }));
+
+  $("btnAddAct").addEventListener("click", () => {
+    const icon = $("addActEmoji").value.trim() || "🔗";
+    const name = $("addActName").value.trim();
+    let url = $("addActUrl").value.trim();
+    if(!name || !url){ toast("Name and URL required", "warn"); return; }
+    if(!/^https?:\/\//i.test(url)) url = "https://" + url;
+    settings.customActions = settings.customActions || [];
+    settings.customActions.push({ name, url, icon });
+    saveSettings(); renderActionsMgr(); renderActions();
+    $("addActEmoji").value = $("addActName").value = $("addActUrl").value = "";
+    toast("Action added", "ok");
+  });
+
+  $("btnExport").addEventListener("click", () => {
+    const dump = { app: "lumbercorp-2", version: "2.0.0", exported: new Date().toISOString(), data: {} };
+    for(let i = 0; i < localStorage.length; i++){
+      const k = localStorage.key(i);
+      if(k && k.startsWith("lc2_")) dump.data[k] = store.get(k, null);
+    }
+    const blob = new Blob([JSON.stringify(dump, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "lumbercorp2-export.json";
+    a.click();
+    URL.revokeObjectURL(a.href);
+    toast("⬇️ Export downloaded", "ok");
+  });
+  $("btnReset").addEventListener("click", () => {
+    if(!confirm("Reset LumberCorp 2.0? Settings, caches, flight and activity will be wiped.")) return;
+    const keys = [];
+    for(let i = 0; i < localStorage.length; i++){
+      const k = localStorage.key(i);
+      if(k && k.startsWith("lc2_")) keys.push(k);
+    }
+    keys.forEach(k => store.del(k));
+    location.reload();
+  });
+}
+function setMode(m){
+  settings.mode = m; state.mode = m; saveSettings(); renderMode();
+  state.lastUpdated = Date.now();
+  if(m === "live"){
+    if(!settings.apiKey){
+      toast("⚠️ Add your Torn API key in Settings first.", "warn");
+      goto("settings");
+      return;
+    }
+    toast("🟢 Live mode — syncing with Torn…", "ok");
+    logAct("🟢", "Switched to LIVE mode");
+    loadLive();
+  } else {
+    if(liveTimer) clearTimeout(liveTimer);
+    state.user = demoUser(); state.faction = demoFaction(); state.items = demoItems(); state.itemCache = null;
+    toast("🟡 Demo mode — simulated player", "ok");
+    logAct("🟡", "Switched to DEMO mode");
+    renderAll();
+  }
+}
+
+/* ============================== INIT ============================== */
+function init(){
+  applyAppearance();
+  wire();
+  renderPlanner();
+  renderAll();
+  renderAlertBadge();
+  renderYataStatus();
+  state.lastUpdated = Date.now();
+  if(state.flight && state.flight.arrive <= Date.now() && !state.flight.landedLogged){
+    // landed while away — surface it once per session
+    logAct("🛬", `Landed in ${state.flight.dest} (while you were gone)`);
+  }
+  if(state.mode === "live" && settings.apiKey) loadLive();
+  else scheduleLive();
+  fetchYata(false);
+  setInterval(() => { simTick(1); updateDynamic(); checkAlerts(); }, 1000);
+  // periodic stock feed re-poll (every 3 min)
+  setInterval(() => fetchYata(false), 3 * 60 * 1000);
+  if("serviceWorker" in navigator && location.protocol.startsWith("http")){
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  }
+  setTimeout(() => {
+    toast("👋 Welcome to <b>LumberCorp 2.0</b> — press <span class='kbadge'>Ctrl K</span> to jump anywhere.");
+  }, 600);
+}
+init();
+</script>
+</body>
+</html>
+periodic stock feed re-poll (every 3 min)
+  setInterval(() => fetchYata(false), 3 * 60 * 1000);
+  if("serviceWorker" in navigator && location.protocol.startsWith("http")){
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  }
+  setTimeout(() => {
+    toast("👋 Welcome to <b>LumberCorp 2.0</b> — press <span class='kbadge'>Ctrl K</span> to jump anywhere.");
+  }, 600);
+}
+init();
+</script>
+</body>
+</html>

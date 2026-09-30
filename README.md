@@ -1,12 +1,39 @@
 [README.md](https://github.com/user-attachments/files/31874506/README.md)
 # LumberCorp Companion — Abroad-Stock Aggregator
 
-## Why this exists
+## ✨ LumberCorp 2.0 (`lumbercorp-2/`)
+
+The next generation of the app lives in **`lumbercorp-2/`** — still a
+zero-dependency, single-file PWA (`index.html` + `sw.js` + manifest + icons).
+
+Run it:
+
+```bash
+cd lumbercorp-2
+python3 -m http.server 8000     # or any static server; then open http://localhost:8000
+```
+
+New over 1.0:
+
+- **Live bar ETAs** — energy/nerve/happy/life tick client-side with “full in …” countdowns
+- **Flight planner** — pick destination + class (Standard/Airstrip/WLT/Business), see arrival/return
+  times, begin a flight and get a live countdown + landing notification (persisted across reloads)
+- **Restock ticker** — abroad markets restock on a fixed 15-min cycle; the bar shows the next one
+- **Abroad profit table** — YATA shop cost vs market value → profit/unit and “total if cleared”
+- **⌘K command palette** (or `/`) — jump to pages, flights, items, links
+- **Notifications** — energy full, flight landed, cooldown finished
+- **Theming** — dark/light + 5 accent finishes; **watchlist** stars; **export/reset**
+- Demo mode by default; add a Torn API key in Settings → Live. Abroad stock still uses
+  YATA with last-good caching (stale-while-revalidate), and honors the same optional
+  `AGGREGATOR_URL` backend described below.
+
+## Why this exists (v1)
 
 Foreign stock in Torn City is **crowd-sourced** — Torn's official API does not
 expose it. The only clean public JSON feed is YATA (`yata.yt`), and YATA goes
 down. A static site can't survive that: it can only cache what each browser has
 already seen.
+
 
 This service is the fix. It is a tiny always-on proxy/cache that:
 
