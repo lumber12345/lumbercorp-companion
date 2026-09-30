@@ -50,6 +50,11 @@
       repeating-linear-gradient(93deg, transparent 0 26px, rgba(120,84,34,.045) 26px 28px, transparent 28px 58px, rgba(120,84,34,.03) 58px 60px);
   }
   [data-theme="light"] .bg-wood{opacity:.5}
+  .bg-rain{
+    position:fixed; inset:0; z-index:-1; pointer-events:none; opacity:.42;
+    width:100%; height:100%;
+  }
+  [data-theme="light"] .bg-rain{opacity:.16}
   ::selection{background:var(--glow)}
   a{color:var(--accent2)}
   input,select,button,textarea{font:inherit;color:inherit}
@@ -432,6 +437,7 @@
 </head>
 <body>
 <div class="bg-wood"></div>
+<canvas class="bg-rain" id="bgRain" aria-hidden="true"></canvas>
 
 <div class="shell">
   <!-- ================= side rail ================= -->
@@ -854,7 +860,7 @@ function flagEmoji(cc){
 }
 
 /* ---------- settings ---------- */
-const APP_VERSION = "2.29.0";
+const APP_VERSION = "2.30.0";
 const DEFAULT_SETTINGS = {
   mode: "demo", apiKey: "", refresh: 60,
   theme: "dark", accent: "amber",
@@ -2774,6 +2780,56 @@ function setMode(m){
     logAct("🟡", "Switched to DEMO mode");
   }
 }
+
+/* ============================== MATRIX RAIN ============================== */
+/* Katakana rain on a fixed canvas behind the shell. The trail fades with
+   destination-out so it works on every theme; reduced motion gets one
+   static frame instead of the loop. */
+(function bgRain(){
+  const cv = $("bgRain"); if(!cv) return;
+  const ctx = cv.getContext("2d");
+  const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const GLYPHS = "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレワヲン0123456789$#@%&";
+  const FS = 15, FRAME = 66;      // 15 px cells, ~15 fps classic drip
+  let cols = 0, drops = [], last = 0;
+
+  function size(){
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+    cv.width = Math.floor(innerWidth * dpr);
+    cv.height = Math.floor(innerHeight * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.font = (FS - 2) + "px ui-monospace,Menlo,Consolas,monospace";
+    cols = Math.ceil(innerWidth / FS);
+    drops = Array.from({length: cols}, () => Math.random() * -60);
+  }
+  function still(){               // one faint static frame, no loop
+    for(let i = 0; i < cols; i++)
+      for(let k = 0; k < 14; k++){
+        ctx.fillStyle = "rgba(61,214,140,.30)";
+        ctx.fillText(GLYPHS[(Math.random() * GLYPHS.length) | 0],
+                     i * FS, ((Math.random() * innerHeight / FS) | 0) * FS);
+      }
+  }
+  function step(now){
+    if(now - last < FRAME){ requestAnimationFrame(step); return; }
+    last = now;
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.fillStyle = "rgba(0,0,0,.09)";
+    ctx.fillRect(0, 0, innerWidth, innerHeight);
+    ctx.globalCompositeOperation = "source-over";
+    for(let i = 0; i < cols; i++){
+      const y = Math.floor(drops[i]);
+      ctx.fillStyle = Math.random() < .06 ? "rgba(214,255,226,.85)" : "rgba(61,214,140,.55)";
+      ctx.fillText(GLYPHS[(Math.random() * GLYPHS.length) | 0], i * FS, y * FS);
+      drops[i] += .5 + (i % 7) * .12;
+      if(y * FS > innerHeight && Math.random() > .975) drops[i] = Math.random() * -40;
+    }
+    requestAnimationFrame(step);
+  }
+  size();
+  addEventListener("resize", () => { size(); if(REDUCED) still(); });
+  if(REDUCED) still(); else requestAnimationFrame(step);
+})();
 
 /* ============================== INIT ============================== */
 function init(){
