@@ -317,7 +317,3 @@ tr.popup-open td:first-child { box-shadow: inset 2px 0 0 #4d9be688; }
   0%, 100% { box-shadow: 0 0 0 0 #e8453c00; }
   50% { box-shadow: 0 0 16px 3px #e8453c73; }
 }
-
-/* embedded in LumberCorp 2.0: the companion renders the sub tabs */
-.rw-embed .tabs{display:none}
-.rw-embed .foot{padding-bottom:18px}
