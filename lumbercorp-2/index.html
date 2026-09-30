@@ -583,7 +583,11 @@
       <div class="card setcard" id="bzScanProxy" hidden>
         <div class="setrow">
           <div><div class="st">📡 Scanner needs its backend</div>
-          <div class="sd">The scanner talks through your proxy (on Render it's wired automatically). Running locally? Paste the proxy URL in <b>Rank Wars → ⚡ Custom backend</b> — both tabs share it.</div></div>
+          <div class="sd">The scanner talks through the LumberCorp proxy — on Render it's wired automatically (<code>RW_PROXY_URL</code>). Running locally? Paste the proxy URL below (saved for the Bazaar tab; the Rank Wars tab is untouched).</div></div>
+        </div>
+        <div class="setrow">
+          <input type="text" id="bzProxyInput" placeholder="https://your-proxy.onrender.com" style="flex:1;min-width:220px;background:var(--card2);border:1px solid var(--border2);border-radius:10px;padding:9px 11px;font-weight:600">
+          <button class="btn sm primary" id="btnBzProxy">Save &amp; scan</button>
         </div>
       </div>
       <div id="bzview-scan" hidden>
@@ -819,7 +823,7 @@ function flagEmoji(cc){
 }
 
 /* ---------- settings ---------- */
-const APP_VERSION = "2.11.0";
+const APP_VERSION = "2.12.0";
 const DEFAULT_SETTINGS = {
   mode: "demo", apiKey: "", refresh: 60,
   theme: "dark", accent: "amber",
@@ -1926,7 +1930,7 @@ function rwEnter(){ rwState.tries = 0; rwFrameOn(); }
 
 const bzViewState = { view: "scan", scanReady: false, findReady: false };
 function bzApiBase(){
-  return (settings.rwProxy || (window.RW_PROXY_URL || "")).trim().replace(/\/$/, "");
+  return (settings.bzProxy || settings.rwProxy || (window.RW_PROXY_URL || "")).trim().replace(/\/$/, "");
 }
 function bzSyncEmbed(){
   try{
@@ -2278,6 +2282,12 @@ function wire(){
     saveSettings();
     rwFrameOn();
     toast(settings.rwProxy ? "⚔️ Proxy set — loading live wars" : "Proxy URL required", settings.rwProxy ? "ok" : "warn");
+  });
+  $("btnBzProxy").addEventListener("click", () => {
+    settings.bzProxy = ($("bzProxyInput").value || "").trim().replace(/\/$/, "");
+    saveSettings();
+    bzApplyView();
+    toast(settings.bzProxy ? "📡 Proxy set — scanner connecting" : "Proxy URL required", settings.bzProxy ? "ok" : "warn");
   });
 }
 /* Blank skeleton used when entering live mode — guarantees no demo numbers
