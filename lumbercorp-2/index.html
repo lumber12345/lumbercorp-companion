@@ -115,21 +115,7 @@
   .bz-subtabs button:hover{color:var(--text);border-color:var(--border2)}
   .bz-subtabs button.active{background:var(--card3);color:var(--text);border-color:var(--accent);box-shadow:0 2px 12px var(--glow)}
   .bz-subtabs .live-dot{width:7px;height:7px;border-radius:50%;background:var(--ok);animation:pulse 2s infinite}
-  #bzFrame{width:100%;height:clamp(560px,80vh,1100px);border:1px solid var(--border2);border-radius:14px;background:#0b0e14;display:block;margin-top:12px}
-
-  /* ================= bazaar finder ================= */
-  .bz-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 2px 12px}
-  .bz-bar input{flex:1;min-width:220px;background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-weight:600}
-  .bz-bar input:focus{outline:none;border-color:var(--accent)}
-  .bz-list{max-height:210px;overflow:auto;display:grid;gap:4px;margin:0 2px 12px}
-  .bz-item{display:flex;justify-content:space-between;gap:10px;padding:8px 12px;background:var(--card);border:1px solid var(--border);border-radius:10px;cursor:pointer;transition:.15s;font-size:13px;color:var(--text)}
-  .bz-item:hover{border-color:var(--accent);transform:translateY(-1px)}
-  .bz-item .bz-cat{color:var(--muted);font-size:11px}
-  .bz-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 2px 10px}
-  .bz-table{width:100%;border-collapse:collapse;font-size:13px}
-  .bz-table th{color:var(--muted);text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:8px 10px;border-bottom:1px solid var(--border2)}
-  .bz-table td{padding:9px 10px;border-bottom:1px solid var(--border)}
-  .bz-table tr.best td{color:var(--ok);font-weight:800}
+  #bzFrame,#bzFindFrame{width:100%;height:clamp(560px,80vh,1100px);border:1px solid var(--border2);border-radius:14px;background:#0b0e14;display:block;margin-top:12px}
 
   /* ================= rank wars ================= */
   /* ---- rank wars sub tabs (mirror of the rankwars app tabs) ---- */
@@ -604,20 +590,9 @@
         <iframe id="bzFrame" title="Torn Bazaar Scanner" src="about:blank" referrerpolicy="no-referrer"></iframe>
       </div>
       <div id="bzview-find" hidden>
-      <div class="card setcard" id="bzNeedKey" hidden>
-        <div class="setrow">
-          <div><div class="st">🛒 Bazaar Finder needs your Torn key</div>
-          <div class="sd">Add your API key in <b>Settings</b> (a Public key is enough) — the finder then searches real bazaar listings straight from the official Torn API. No proxy needed.</div></div>
-        </div>
+      <div id="bzFindWrap" hidden>
+        <iframe id="bzFindFrame" title="Bazaar Finder — Torn Bazaar Scanner" src="about:blank" referrerpolicy="no-referrer"></iframe>
       </div>
-      <div class="bz-bar">
-        <input type="text" id="bzSearch" placeholder="Search items — e.g. Xanax, Plushie, Flower…" autocomplete="off" spellcheck="false">
-        <button class="btn sm primary" id="bzGo">Find</button>
-      </div>
-      <div id="bzSuggest" class="bz-list" hidden></div>
-      <div class="bz-head" id="bzHead" hidden></div>
-      <div id="bzStatus"></div>
-      <div id="bzResult"></div>
       </div><!-- /bzview-find -->
     </section>
 
@@ -844,7 +819,7 @@ function flagEmoji(cc){
 }
 
 /* ---------- settings ---------- */
-const APP_VERSION = "2.9.0";
+const APP_VERSION = "2.11.0";
 const DEFAULT_SETTINGS = {
   mode: "demo", apiKey: "", refresh: 60,
   theme: "dark", accent: "amber",
@@ -1949,142 +1924,7 @@ async function rwWake(){
 }
 function rwEnter(){ rwState.tries = 0; rwFrameOn(); }
 
-/* ============================== BAZAAR FINDER ============================== */
-/* Searches real Torn bazaar listings via the v1 API (browser-safe, CORS OK)
- * using the key the app already has. Item index is fetched once and cached
- * in localStorage for a week. Demo mode uses a small built-in item list. */
-const bzState = { items: null, itemsLoading: false, item: null, rows: [], loading: false };
-const BZ_DEMO_ITEMS = [
-  { id: 206, name: "Xanax", type: "Drug", mv: 900000 },
-  { id: 212, name: "Lollipop", type: "Booster", mv: 45000 },
-  { id: 434, name: "Ectoplasm", type: "Special", mv: 750 },
-  { id: 616, name: "Bottle of Beer", type: "Alcohol", mv: 120 },
-  { id: 190, name: "Sheep Plushie", type: "Plushie", mv: 6500 }
-];
-function bzKey(){ return (settings.apiKey || "").trim(); }
-function bzEsc(s){
-  s = String(s).split("&").join("&amp;").split("<").join("&lt;").split(">").join("&gt;").split('"').join("&quot;");
-  return s;
-}
-function bzChip(txt, cls){ $("bzStatus").innerHTML = '<span class="chip ' + (cls || "") + '">' + txt + "</span>"; }
-function bzCacheGet(){
-  try{
-    const c = JSON.parse(localStorage.getItem("lc2_bzitems") || "null");
-    if(c && c.ts && Date.now() - c.ts < 7 * 86400 * 1000 && Array.isArray(c.items) && c.items.length > 500) return c.items;
-  }catch(e){}
-  return null;
-}
-async function bzEnsureItems(){
-  if(state.mode !== "live"){ bzState.items = BZ_DEMO_ITEMS; return; }
-  if(!bzKey()) return;
-  const cached = bzCacheGet();
-  if(cached){ bzState.items = cached; return; }
-  if(bzState.itemsLoading) return;
-  bzState.itemsLoading = true;
-  bzChip("📦 Loading item index…", "warn");
-  try{
-    const j = await tornFetch(API + "/torn/?selections=items&key=" + encodeURIComponent(bzKey()) + "&comment=lumbercorp2");
-    const items = Object.values(j.items || {})
-      .map(it => ({ id: +it.id, name: String(it.name || ""), type: String(it.type || ""), mv: +it.market_value || 0 }))
-      .filter(it => it.id && it.name)
-      .sort((a, b) => a.name.localeCompare(b.name));
-    if(items.length < 500) throw new Error("Unexpected item index");
-    bzState.items = items;
-    try{ localStorage.setItem("lc2_bzitems", JSON.stringify({ ts: Date.now(), items })); }catch(e){}
-  }catch(e){
-    bzChip("⚠️ Item index: " + (e.code != null ? describeApiError(e) : e.message), "bad");
-  }
-  bzState.itemsLoading = false;
-}
-function bzSuggest(){
-  const q = ($("bzSearch").value || "").trim().toLowerCase();
-  const box = $("bzSuggest");
-  if(q.length < 2 || !bzState.items){ box.hidden = true; box.innerHTML = ""; return; }
-  const starts = [], incl = [];
-  for(const it of bzState.items){
-    const n = it.name.toLowerCase();
-    if(n === q){ starts.unshift(it); continue; }
-    if(n.startsWith(q)) starts.push(it);
-    else if(n.includes(q)) incl.push(it);
-    if(starts.length + incl.length > 200) break;
-  }
-  const matches = starts.concat(incl).slice(0, 30);
-  if(!matches.length){ box.hidden = true; box.innerHTML = ""; return; }
-  box.hidden = false;
-  box.innerHTML = matches.map(it =>
-    '<button class="bz-item" data-bzid="' + it.id + '"><span>' + bzEsc(it.name) + '</span><span class="bz-cat">#' + it.id + " · " + bzEsc(it.type || "Item") + "</span></button>").join("");
-}
-function bzPickFirst(){
-  const q = ($("bzSearch").value || "").trim().toLowerCase();
-  if(!q || !bzState.items) return;
-  const exact = bzState.items.find(it => it.name.toLowerCase() === q);
-  if(exact) return bzLoad(exact.id);
-  const first = $("bzSuggest").querySelector(".bz-item");
-  if(first) return bzLoad(+first.dataset.bzid);
-  bzChip("⚠️ No item matches — pick a suggestion from the list", "warn");
-}
-async function bzLoad(id){
-  if(!bzState.items) return;
-  const it = bzState.items.find(x => x.id === +id);
-  if(!it) return;
-  bzState.item = it;
-  bzState.rows = [];
-  bzRender();
-  if(state.mode === "live"){
-    if(!bzKey()){ bzChip("⚠️ No API key — add one in Settings", "bad"); return; }
-    bzChip("🔎 Searching bazaars…", "warn");
-    try{
-      const j = await tornFetch(API + "/market/" + it.id + "/?selections=bazaar&key=" + encodeURIComponent(bzKey()) + "&comment=lumbercorp2");
-      let rows = Array.isArray(j.bazaar) ? j.bazaar.slice() : Object.values(j.bazaar || {});
-      rows = rows.map((r, i) => ({
-        lid: +r.ID || i + 1,
-        uid: r.userID != null ? +r.userID : null,
-        qty: +r.quantity || 0,
-        unit: +r.cost || 0
-      })).filter(r => r.qty > 0 && r.unit >= 0);
-      rows.sort((a, b) => (a.unit - b.unit) || (b.qty - a.qty));
-      bzState.rows = rows;
-      bzChip("🟢 live · " + rows.length + " listings · via Torn API", rows.length ? "ok" : "warn");
-    }catch(e){
-      bzChip("⚠️ " + (e.code != null ? describeApiError(e) : e.message), "bad");
-    }
-  } else {
-    const seed = it.id;
-    bzState.rows = [0, 1, 2, 3, 4, 5].map(i => ({
-      lid: i + 1, uid: null,
-      qty: ((seed * 7 + i * 13) % 40) + 1,
-      unit: Math.max(1, Math.round(it.mv * (0.82 + ((seed + i * 31) % 25) / 100)))
-    })).sort((a, b) => (a.unit - b.unit) || (b.qty - a.qty));
-    bzChip("demo data — switch to Live mode for real listings", "warn");
-  }
-  bzRender();
-}
-function bzRender(){
-  const head = $("bzHead"), out = $("bzResult");
-  const it = bzState.item;
-  if(!it){ head.hidden = true; head.innerHTML = ""; out.innerHTML = ""; return; }
-  const rows = bzState.rows;
-  const best = rows.length ? rows[0].unit : null;
-  head.hidden = false;
-  head.innerHTML =
-    '<span style="font-weight:800;font-size:15px">' + bzEsc(it.name) + "</span>" +
-    (it.type ? '<span class="chip">' + bzEsc(it.type) + "</span>" : "") +
-    (it.mv ? '<span class="chip">Torn value ' + fmtMoney(it.mv) + "</span>" : "") +
-    (best != null ? '<span class="chip ok">Best ' + fmtMoney(best) + "</span>" : "");
-  if(!rows.length){ out.innerHTML = '<div class="empty">No listings found.</div>'; return; }
-  const MAX = 50;
-  let html = '<div style="overflow:auto"><table class="bz-table"><thead><tr><th>#</th><th>Seller</th><th>Qty</th><th>Unit price</th><th>Total</th></tr></thead><tbody>';
-  rows.slice(0, MAX).forEach((r, i) => {
-    const seller = r.uid
-      ? '<a href="https://www.torn.com/bazaar.php?userId=' + r.uid + '" target="_blank" rel="noopener" style="color:var(--accent);font-weight:700">user #' + r.uid + "</a>"
-      : "—";
-    html += '<tr' + (i === 0 ? ' class="best"' : "") + '><td>' + (i + 1) + "</td><td>" + seller + "</td><td>" + fmtInt(r.qty) + "</td><td>" + fmtMoney(r.unit) + "</td><td>" + fmtMoney(r.unit * r.qty) + "</td></tr>";
-  });
-  html += "</tbody></table></div>";
-  if(rows.length > MAX) html += '<div class="sd" style="margin:8px 2px">+ ' + (rows.length - MAX) + " more listings not shown — cheapest always first.</div>";
-  out.innerHTML = html;
-}
-const bzViewState = { view: "scan", frameReady: false };
+const bzViewState = { view: "scan", scanReady: false, findReady: false };
 function bzApiBase(){
   return (settings.rwProxy || (window.RW_PROXY_URL || "")).trim().replace(/\/$/, "");
 }
@@ -2094,31 +1934,28 @@ function bzSyncEmbed(){
     if((settings.apiKey || "").trim()) localStorage.setItem("torn_bazaar_api_key", settings.apiKey.trim());
   }catch(e){ /* storage unavailable — embed asks for its own key */ }
 }
-function bzScanOn(){
-  const live = state.mode === "live", base = !!bzApiBase();
-  $("bzScanNote").hidden = live;
-  $("bzScanProxy").hidden = !(live && !base);
-  $("bzview-scan").hidden = !(live && base);
-  if(live && base){
-    bzSyncEmbed();
-    if(!bzViewState.frameReady){ $("bzFrame").src = "bazaar/index.html"; bzViewState.frameReady = true; }
-  }
+/* Both sub-tabs embed the same Bazaar Scanner app (lumber12345/bazaar). */
+function bzApplyView(){
+  const v = bzViewState.view;
+  const ready = state.mode === "live" && !!bzApiBase();
+  $("bzScanNote").hidden = state.mode === "live";
+  $("bzScanProxy").hidden = !(state.mode === "live" && !bzApiBase());
+  $("bzview-scan").hidden = v !== "scan" || !ready;
+  $("bzview-find").hidden = v !== "find";
+  $("bzFindWrap").hidden = v !== "find" || !ready;
+  if(!ready) return;
+  bzSyncEmbed();
+  if(v === "scan" && !bzViewState.scanReady){ $("bzFrame").src = "bazaar/index.html"; bzViewState.scanReady = true; }
+  if(v === "find" && !bzViewState.findReady){ $("bzFindFrame").src = "bazaar/index.html"; bzViewState.findReady = true; }
 }
 function bzSetView(v){
   if(!["scan", "find"].includes(v)) return;
   bzViewState.view = v;
   document.querySelectorAll("#bzSubTabs button").forEach(b =>
     b.classList.toggle("active", b.dataset.bzview === v));
-  $("bzview-find").hidden = v !== "find";
-  if(v === "scan") bzScanOn();
+  bzApplyView();
 }
-function bzEnter(){
-  $("bzNeedKey").hidden = !(state.mode === "live" && !bzKey());
-  bzEnsureItems();
-  if(bzState.item) bzRender();
-  bzScanOn();
-  if(bzViewState.view === "find") $("bzview-find").hidden = false;
-}
+function bzEnter(){ bzApplyView(); }
 /* ============================== TICKER ============================== */
 /* Advance bars client-side each second (works for demo & between live polls). */
 function simTick(dt){
@@ -2435,14 +2272,6 @@ function wire(){
   // bazaar finder
   document.querySelectorAll("#bzSubTabs button").forEach(b =>
     b.addEventListener("click", () => bzSetView(b.dataset.bzview)));
-  $("bzSearch").addEventListener("input", bzSuggest);
-  $("bzSearch").addEventListener("keydown", (e) => { if(e.key === "Enter"){ e.preventDefault(); bzPickFirst(); } });
-  $("bzGo").addEventListener("click", bzPickFirst);
-  $("bzSuggest").addEventListener("click", (e) => {
-    const b = e.target.closest(".bz-item");
-    if(!b) return;
-    bzLoad(+b.dataset.bzid);
-  });
   // rank wars
   $("btnRwProxy").addEventListener("click", () => {
     settings.rwProxy = ($("rwProxyInput").value || "").trim().replace(/\/$/, "");
