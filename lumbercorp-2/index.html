@@ -438,7 +438,7 @@
     <button class="navitem" data-page="rankwars"><span class="ni">⚔️</span> Rank Wars</button>
     <button class="navitem" data-page="stats"><span class="ni">📈</span> Stats</button>
     <button class="navitem" data-page="alerts"><span class="ni">🔔</span> Alerts <span class="badge" id="alertBadge" hidden>0</span></button>
-    <button class="navitem" data-page="companion"><span class="ni">🧰</span> Toolkit</button>
+    <button class="navitem" data-page="companion"><span class="ni">🧭</span> Companion</button>
     <button class="navitem" data-page="settings"><span class="ni">⚙️</span> Settings</button>
     <div class="railfoot">
       <button class="modebadge" id="modeBadge" title="Toggle demo / live mode">
@@ -755,7 +755,7 @@
   <button data-page="rankwars"><span class="ti">⚔️</span>Wars</button>
   <button data-page="stats"><span class="ti">📈</span>Stats</button>
   <button data-page="alerts"><span class="ti">🔔</span>Alerts<span class="badge" id="alertBadgeM" hidden>0</span></button>
-  <button data-page="companion"><span class="ti">🧰</span>Tools</button>
+  <button data-page="companion"><span class="ti">🧭</span>Comp</button>
   <button data-page="settings"><span class="ti">⚙️</span>Setup</button>
 </nav>
 
@@ -846,7 +846,7 @@ function flagEmoji(cc){
 }
 
 /* ---------- settings ---------- */
-const APP_VERSION = "2.3.0";
+const APP_VERSION = "2.3.1";
 const DEFAULT_SETTINGS = {
   mode: "demo", apiKey: "", refresh: 60,
   theme: "dark", accent: "amber",
@@ -1378,7 +1378,7 @@ const PAGES = {
   rankwars:  ["Rank Wars", "Live ranked war tracker"],
   stats:     ["Stats", "Career & faction"],
   alerts:    ["Alerts", "Notifications & activity"],
-  companion: ["Toolkit", "Notes, timers, targets & tools"],
+  companion: ["Companion", "Notes, timers, targets & tools"],
   settings:  ["Settings", "Make it yours"]
 };
 function goto(page){
