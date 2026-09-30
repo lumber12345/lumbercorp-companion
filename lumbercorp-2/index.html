@@ -104,17 +104,6 @@
   .clockbox b{color:var(--muted);font-variant-numeric:tabular-nums;font-weight:600}
 
   /* ---- bazaar sub tabs ---- */
-  .bz-subtabs{display:flex;gap:6px;margin:0 2px 12px;overflow-x:auto;scrollbar-width:none}
-  .bz-subtabs::-webkit-scrollbar{display:none}
-  .bz-subtabs button{
-    display:inline-flex;align-items:center;gap:6px;flex:0 0 auto;
-    background:var(--card);border:1px solid var(--border);color:var(--muted);
-    font-size:12.5px;font-weight:700;padding:8px 14px;border-radius:99px;cursor:pointer;transition:.15s;
-    white-space:nowrap;
-  }
-  .bz-subtabs button:hover{color:var(--text);border-color:var(--border2)}
-  .bz-subtabs button.active{background:var(--card3);color:var(--text);border-color:var(--accent);box-shadow:0 2px 12px var(--glow)}
-  .bz-subtabs .live-dot{width:7px;height:7px;border-radius:50%;background:var(--ok);animation:pulse 2s infinite}
   #bzFrame{width:100%;height:clamp(560px,80vh,1100px);border:1px solid var(--border2);border-radius:14px;background:#0b0e14;display:block;margin-top:12px}
 
   /* ================= rank wars ================= */
@@ -570,9 +559,6 @@
 
     <!-- ============ BAZAAR FINDER ============ -->
     <section id="page-bazaar" hidden>
-      <nav class="bz-subtabs" id="bzSubTabs">
-        <button class="active" data-bzview="scan"><span class="live-dot"></span> Scanner</button>
-      </nav>
       <div class="card setcard" id="bzScanNote" hidden>
         <div class="setrow">
           <div><div class="st">🔬 Bazaar Scanner runs on live Torn data</div>
@@ -808,7 +794,7 @@ function flagEmoji(cc){
 }
 
 /* ---------- settings ---------- */
-const APP_VERSION = "2.16.0";
+const APP_VERSION = "2.17.0";
 const DEFAULT_SETTINGS = {
   mode: "demo", apiKey: "", refresh: 60,
   theme: "dark", accent: "amber",
@@ -1920,7 +1906,7 @@ function rwEnter(){ rwState.tries = 0; rwFrameOn(); }
  * copy running against your proxy. Free Render instances sleep after
  * 15 min idle, so a wake card pings and retries automatically. */
 const BZ_REMOTE = "https://bazaar-i5o8.onrender.com";
-const bzViewState = { view: "scan", src: null, tries: 0, timer: null, frameSrc: { scan: null } };
+const bzViewState = { src: null, tries: 0, timer: null, frameSrc: null };
 function bzApiBase(){
   return (settings.bzProxy || settings.rwProxy || (window.RW_PROXY_URL || "")).trim().replace(/\/$/, "");
 }
@@ -1933,10 +1919,10 @@ function bzSyncEmbed(){
 function bzSource(){
   return (bzViewState.src === "local" || !!settings.bzProxy) ? "local" : "remote";
 }
-function bzSetFrame(which, url){
-  if(bzViewState.frameSrc[which] === url) return;
+function bzSetFrame(url){
+  if(bzViewState.frameSrc === url) return;
   $("bzFrame").src = url;
-  bzViewState.frameSrc[which] = url;
+  bzViewState.frameSrc = url;
 }
 function bzPingRemote(){
   return new Promise((resolve) => {
@@ -1986,7 +1972,6 @@ function bzCard(html){
   });
 }
 function bzApplyView(){
-  const v = bzViewState.view;
   $("bzScanNote").hidden = state.mode === "live";
   if(state.mode !== "live"){
     $("bzScanProxy").hidden = true;
@@ -2008,9 +1993,9 @@ function bzApplyView(){
       </div>`);
       return;
     }
-    $("bzview-scan").hidden = v !== "scan";
+    $("bzview-scan").hidden = false;
     bzSyncEmbed();
-    bzSetFrame(v, "bazaar/index.html");
+    bzSetFrame("bazaar/index.html");
     bzCard(`<div class="setrow"><div><div class="st">🔗 Built-in scanner → ${(bzApiBase() || "").replace(/^https?:\/\//, "").replace(/\/$/, "")}</div>
     <div class="sd">Not loading? That proxy may be asleep or suspended — retry it, or switch back to your Render deployment.</div></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" id="btnBzRetry">⟳ Retry</button><button class="btn sm" id="btnBzRemote">Use my deployment</button></div></div>`);
@@ -2023,12 +2008,11 @@ function bzApplyView(){
 async function bzWake(){
   const up = await bzPingRemote();
   if(state.mode !== "live" || bzSource() !== "remote") return;
-  const v = bzViewState.view;
   if(up){
     if(bzViewState.timer){ clearTimeout(bzViewState.timer); bzViewState.timer = null; }
     $("bzScanProxy").hidden = true;
-    $("bzview-scan").hidden = v !== "scan";
-    bzSetFrame(v, BZ_REMOTE + "/");
+    $("bzview-scan").hidden = false;
+    bzSetFrame(BZ_REMOTE + "/");
     return;
   }
   $("bzview-scan").hidden = true;
@@ -2063,13 +2047,6 @@ async function bzWake(){
     if(bzViewState.timer) clearTimeout(bzViewState.timer);
     bzViewState.timer = setTimeout(() => { if(state.page === "bazaar" && state.mode === "live" && bzSource() === "remote") bzWake(); }, 5000);
   }
-}
-function bzSetView(v){
-  if(v !== "scan") return;
-  bzViewState.view = v;
-  document.querySelectorAll("#bzSubTabs button").forEach(b =>
-    b.classList.toggle("active", b.dataset.bzview === v));
-  bzApplyView();
 }
 function bzEnter(){ bzApplyView(); }
 /* ============================== TICKER ============================== */
@@ -2386,8 +2363,6 @@ function wire(){
 
 
   // bazaar finder
-  document.querySelectorAll("#bzSubTabs button").forEach(b =>
-    b.addEventListener("click", () => bzSetView(b.dataset.bzview)));
   // rank wars
   $("btnRwProxy").addEventListener("click", () => {
     settings.rwProxy = ($("rwProxyInput").value || "").trim().replace(/\/$/, "");
