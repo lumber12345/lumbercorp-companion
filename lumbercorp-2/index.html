@@ -764,7 +764,7 @@ function flagEmoji(cc){
 }
 
 /* ---------- settings ---------- */
-const APP_VERSION = "2.0.5";
+const APP_VERSION = "2.0.6";
 const DEFAULT_SETTINGS = {
   mode: "demo", apiKey: "", refresh: 60,
   theme: "dark", accent: "amber",
@@ -820,7 +820,7 @@ const STAT_DEFS = [
 const DESTINATIONS = [
   {country:"Mexico", city:"Ciudad Juarez", flag:"MX",
     times:{standard:24, airstrip:17, wlt:12, business:7}, cost:6500,
-    items:[{n:"Dahlia Flower", price:300, kind:"flower"}]},
+    items:[{n:"Dahlia", price:300, kind:"flower"}]},
   {country:"Cayman Islands", city:"George Town", flag:"KY",
     times:{standard:33, airstrip:23, wlt:17, business:10}, cost:10000,
     items:[{n:"Banana Orchid", price:4000, kind:"flower"},
@@ -828,17 +828,17 @@ const DESTINATIONS = [
            {n:"Trout", price:25000, kind:"other"}]},
   {country:"Canada", city:"Toronto", flag:"CA",
     times:{standard:39, airstrip:27, wlt:19, business:12}, cost:9000,
-    items:[{n:"Crocus Flower", price:600, kind:"flower"},
+    items:[{n:"Crocus", price:600, kind:"flower"},
            {n:"Wolverine Plushie", price:30, kind:"plushie"}]},
   {country:"Hawaii", city:"Honolulu", flag:"US",
     times:{standard:127, airstrip:89, wlt:63, business:38}, cost:11000,
-    items:[{n:"Orchid Flower", price:700, kind:"flower"},
+    items:[{n:"Orchid", price:700, kind:"flower"},
            {n:"Stingray Plushie", price:400, kind:"plushie"}]},
   {country:"United Kingdom", city:"London", flag:"GB",
     times:{standard:151, airstrip:106, wlt:75, business:45}, cost:18000,
     items:[{n:"Nessie Plushie", price:200, kind:"plushie"},
            {n:"Red Fox Plushie", price:1000, kind:"plushie"},
-           {n:"Heart Flower", price:3000, kind:"flower"}]},
+           {n:"Heather", price:3000, kind:"flower"}]},
   {country:"Argentina", city:"Buenos Aires", flag:"AR",
     times:{standard:158, airstrip:111, wlt:79, business:47}, cost:21000,
     items:[{n:"Ceibo Flower", price:500, kind:"flower"},
@@ -1132,6 +1132,12 @@ function scheduleLive(){
 
 /* ============================== YATA FEED ============================== */
 let yataData = store.get("lc2_yata_cache", null);
+/* migrate a legacy raw-shaped cache from earlier builds */
+if(yataData && !yataData.__v2){
+  const norm = normalizeYataFeed(yataData);
+  if(norm){ yataData = norm; store.set("lc2_yata_cache", norm); }
+  else yataData = null;
+}
 let yataUpdatedAt = store.get("lc2_yata_updated", 0);
 let yataLoading = false;
 let yataStale = false;
@@ -1144,9 +1150,10 @@ async function fetchYata(force){
     const r = await fetch(YATA_URL, { cache: "no-store" });
     if(!r.ok) throw new Error("HTTP " + r.status);
     const j = await r.json();
-    if(j && j.stocks){
-      yataData = j; yataUpdatedAt = Date.now(); yataStale = false;
-      store.set("lc2_yata_cache", j);
+    const norm = normalizeYataFeed(j);
+    if(norm){
+      yataData = norm; yataUpdatedAt = Date.now(); yataStale = false;
+      store.set("lc2_yata_cache", norm);
       store.set("lc2_yata_updated", yataUpdatedAt);
     }
   }catch(e){
@@ -1156,7 +1163,8 @@ async function fetchYata(force){
         const r2 = await fetch(AGGREGATOR_URL + "/api/abroad-stock", { cache: "no-store" });
         if(r2.ok){
           const a = await r2.json();
-          if(a && a.stocks){ yataData = a; yataUpdatedAt = a.updatedAt || Date.now(); yataStale = !!a.stale; got = true; }
+          const na = normalizeYataFeed(a);
+          if(na){ yataData = na; yataUpdatedAt = a.updatedAt || Date.now(); yataStale = !!a.stale; got = true; }
         }
       }catch(e2){}
     }
@@ -1175,6 +1183,58 @@ async function fetchYata(force){
 function yataFor(country){
   if(!yataData || !yataData.stocks) return null;
   return yataData.stocks[YATA_CODES[country]] || null;
+}
+/* YATA's REAL shape: stocks[code].stocks is an ARRAY of {id,name,quantity,cost}
+   (older docs/aggregators key items by name). Normalize both into a
+   lowercase-name map per country so lookups are fast and shape-independent. */
+function normalizeYataFeed(raw){
+  if(!raw || !raw.stocks) return null;
+  const out = { __v2: true, stocks: {} };
+  for(const [code, c] of Object.entries(raw.stocks)){
+    const items = {};
+    let list = null;
+    if(Array.isArray(c && c.stocks)) list = c.stocks;
+    else if(c && c.stocks && typeof c.stocks === "object"){
+      list = Object.entries(c.stocks).map(([name, v]) =>
+        ({ id: (v && v.id) ?? null, name, quantity: v && v.quantity, cost: v && v.cost }));
+    }
+    if(list){
+      for(const it of list){
+        if(it && it.name) items[String(it.name).toLowerCase()] = {
+          id: it.id ?? null, name: it.name,
+          quantity: Number(it.quantity) || 0, cost: Number(it.cost) || 0
+        };
+      }
+    }
+    out.stocks[code] = { stocks: items, update: (c && c.update) || 0 };
+  }
+  return out;
+}
+/* Tolerant item lookup: exact → strip "flower" suffix → substring. */
+function yataStockFor(country, itemName){
+  const y = yataFor(country);
+  if(!y || !y.stocks) return null;
+  const n = String(itemName || "").toLowerCase().trim();
+  if(!n) return null;
+  if(y.stocks[n]) return y.stocks[n];
+  const strip = s => s.replace(/\s+flower$/i, "");
+  const ns = strip(n);
+  for(const [k, v] of Object.entries(y.stocks)){ if(strip(k) === ns) return v; }
+  for(const [k, v] of Object.entries(y.stocks)){ if(k.includes(n) || n.includes(k)) return v; }
+  return null;
+}
+/* Curated highlights + EVERYTHING the feed reports for a country. */
+function countryItems(d){
+  const list = d.items.map(it => ({ n: it.n, kind: it.kind, price: it.price, curated: true }));
+  const y = yataFor(d.country);
+  if(y && y.stocks){
+    for(const v of Object.values(y.stocks)){
+      if(!list.some(x => x.n.toLowerCase() === v.name.toLowerCase())){
+        list.push({ n: v.name, kind: "abroad", price: v.cost, curated: false });
+      }
+    }
+  }
+  return list;
 }
 /* Torn restocks abroad markets every 15 minutes (fixed cycle). */
 function restockInfo(){
@@ -1409,14 +1469,12 @@ function renderDestGrid(){
     const soonest = Math.min(...Object.values(d.times));
     const y = yataFor(d.country);
     let chips = d.items.slice(0, 3).map(it => {
-      let qty = null;
-      if(y && y.stocks){
-        const match = Object.entries(y.stocks).find(([name]) => name.toLowerCase() === it.n.toLowerCase());
-        if(match) qty = match[1].quantity;
-      }
-      return `<span class="itemchip">${escHtml(it.n)} ${qty == null ? "" : (qty > 0 ? "<b>×" + qty + "</b>" : '<span class="zero">×0</span>')}</span>`;
+      const feed = yataStockFor(d.country, it.n);
+      const qty = feed ? feed.quantity : null;
+      return `<span class="itemchip">${escHtml(it.n)} ${qty == null ? "" : (qty > 0 ? "<b>×" + fmtInt(qty) + "</b>" : '<span class="zero">×0</span>')}</span>`;
     }).join("");
-    const more = d.items.length > 3 ? `<span class="itemchip">+${d.items.length - 3} more</span>` : "";
+    const extra = Math.max(0, countryItems(d).length - 3);
+    const more = extra > 0 ? `<span class="itemchip">+${extra} more</span>` : "";
     return `<div class="card dest" data-dest="${escHtml(d.country)}">
       <div class="dhead">
         <span class="fl">${flagEmoji(d.flag)}</span>
@@ -1443,15 +1501,14 @@ function openStockSheet(country){
   $("sheetFlag").textContent = flagEmoji(d.flag);
   $("sheetTitle").textContent = d.country + " — " + d.city;
   const upd = y && y.update ? new Date(y.update * 1000).toLocaleString() : null;
+  const feedCount = y && y.stocks ? Object.keys(y.stocks).length : 0;
   $("sheetSub").textContent = y
-    ? (upd ? "feed updated " + upd + (yataStale ? " · stale" : "") : "abroad stock")
+    ? (upd ? "feed updated " + upd + " · " + feedCount + " items abroad" + (yataStale ? " · stale" : "") : "abroad stock")
     : "no feed data for this country yet";
-  let rows = d.items.map(it => {
-    let qty = null, cost = it.price;
-    if(y && y.stocks){
-      const match = Object.entries(y.stocks).find(([name]) => name.toLowerCase() === it.n.toLowerCase());
-      if(match){ qty = match[1].quantity; if(match[1].cost) cost = match[1].cost; }
-    }
+  let rows = countryItems(d).map(it => {
+    const feed = yataStockFor(country, it.n);
+    const qty = feed ? feed.quantity : null;
+    const cost = (feed && feed.cost) ? feed.cost : it.price;
     const mkt = itemMarketValue(it.n);
     const profit = mkt != null ? mkt - cost : null;
     return { it, qty, cost, mkt, profit };
@@ -1520,12 +1577,10 @@ function renderAbroad(){
   const country = sel.value || DESTINATIONS[0].country;
   const d = DESTINATIONS.find(x => x.country === country);
   const y = yataFor(country);
-  let rows = d.items.map(it => {
-    let qty = null, cost = it.price;
-    if(y && y.stocks){
-      const m = Object.entries(y.stocks).find(([n]) => n.toLowerCase() === it.n.toLowerCase());
-      if(m){ qty = m[1].quantity; if(m[1].cost) cost = m[1].cost; }
-    }
+  let rows = countryItems(d).map(it => {
+    const feed = yataStockFor(country, it.n);
+    const qty = feed ? feed.quantity : null;
+    const cost = (feed && feed.cost) ? feed.cost : it.price;
     const mkt = itemMarketValue(it.n);
     return { it, qty, cost, mkt, profit: mkt != null ? mkt - cost : null,
              total: (mkt != null && qty) ? (mkt - cost) * qty : null };
