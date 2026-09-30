@@ -588,6 +588,9 @@
             <button data-mode="live">Live</button>
           </div>
         </div>
+        <div class="setrow" id="capsRow" hidden>
+          <div><div class="st">Key access detected</div><div class="sd" id="capsTxt"></div></div>
+        </div>
         <div class="setrow">
           <div style="min-width:140px"><div class="st">Torn API key</div><div class="sd">Stored only in this browser</div></div>
           <div class="keyrow">
@@ -756,7 +759,7 @@ function flagEmoji(cc){
 }
 
 /* ---------- settings ---------- */
-const APP_VERSION = "2.0.3";
+const APP_VERSION = "2.0.4";
 const DEFAULT_SETTINGS = {
   mode: "demo", apiKey: "", refresh: 60,
   theme: "dark", accent: "amber",
@@ -937,6 +940,10 @@ const state = {
   itemCache: null,          // live Torn item DB (id/name/market_value)
   lastUpdated: 0,
   statsLoaded: false,
+  statsError: null,
+  factionless: false,
+  factionError: null,
+  caps: null,
   notified: { energy:false, flight:false, drug:false, medical:false, booster:false },
   prevCds: null,
   activity: store.get("lc2_activity", []),
@@ -979,9 +986,10 @@ const API = "https://api.torn.com";
 function describeApiError(e){
   if(e.code === 2) return "Incorrect API key.";
   if(e.code === 5) return "Too many requests — slow down.";
-  if(e.code === 7) return "Key lacks access for this call (needs Limited for stats).";
+  if(e.code === 7) return "This key can't access that selection — it needs a higher access level.";
   if(e.code === 8) return "IP ban / cooldown — try later.";
   if(e.code === 9) return "API is currently down.";
+  if(e.code === 16) return "Key access level too low for this selection.";
   return e.message || "Unknown API error";
 }
 async function tornFetch(path){
@@ -1034,11 +1042,12 @@ async function loadLive(){
   }
   state.user = Object.assign(emptyUser(), state.user, u);
   state.lastUpdated = Date.now();
+  state.caps = { basic: true, money: u.money_onhand != null, stats: false, faction: false };
   try{
     const ps = await tornUser("personalstats");
     if(ps && ps.personalstats){
       state.user.personalstats = ps.personalstats;
-      state.statsLoaded = true; state.statsError = null;
+      state.statsLoaded = true; state.statsError = null; state.caps.stats = true;
     } else { state.statsLoaded = false; state.statsError = "empty response from Torn"; }
   }catch(e){ state.statsLoaded = false; state.statsError = describeApiError(e); }
   try{
@@ -1053,6 +1062,8 @@ async function loadLive(){
         age: raw.days_in_faction ?? null,
         leader: null, respect: null, members: null, best_chain: null
       };
+      state.caps.faction = true;
+      state.factionError = null;
       /* Enrich from the faction endpoint when the key has Faction Access
          (adds leader, respect, member count, best chain). Fails soft. */
       try{
@@ -1070,9 +1081,15 @@ async function loadLive(){
         }
       }catch(e2){}
     } else {
-      state.faction = null;   // factionless (faction_id 0)
+      state.faction = null;          // faction_id 0 → genuinely factionless
+      state.factionless = true;
+      state.factionError = null;
     }
-  }catch(e){ state.faction = null; }
+  }catch(e){
+    state.faction = null;
+    state.factionless = false;
+    state.factionError = describeApiError(e);   // key level, API down, etc.
+  }
   renderAll();
   scheduleLive();
 }
@@ -1502,13 +1519,7 @@ function renderStats(){
   const f = state.faction;
   const isDemo = state.mode === "demo";
   let facHtml;
-  if(!f || !f.name){
-    facHtml = `<div class="card faction">
-      <div class="femblem">🏰</div>
-      <div><div class="fname">No faction ${isDemo ? '<span class="chip warn">demo</span>' : ""}</div>
-      <div class="fsub">${isDemo ? "" : "You're factionless — or your key lacks Faction Access for full details"}</div></div>
-    </div>`;
-  } else {
+  if(f && f.name){
     const stats = [];
     if(f.respect != null)  stats.push(["Respect", fmtInt(f.respect)]);
     if(f.members != null)  stats.push(["Members", fmtInt(f.members)]);
@@ -1522,6 +1533,29 @@ function renderStats(){
       <div><div class="fname">${escHtml(f.name)} ${f.tag ? `<span class="chip accent">${escHtml(f.tag)}</span>` : ""} ${isDemo ? '<span class="chip warn">demo</span>' : ""}</div>
       <div class="fsub">${sub}</div></div>
       ${stats.length ? `<div class="fstats">${stats.map(([l, v]) => `<div><small>${l}</small><b>${v}</b></div>`).join("")}</div>` : ""}
+    </div>`;
+  } else if(isDemo){
+    facHtml = `<div class="card faction">
+      <div class="femblem">🏰</div>
+      <div><div class="fname">No faction <span class="chip warn">demo</span></div></div>
+    </div>`;
+  } else if(state.factionError){
+    facHtml = `<div class="card faction">
+      <div class="femblem">🏰</div>
+      <div><div class="fname">Faction unavailable <span class="chip warn">live</span></div>
+      <div class="fsub">${escHtml(state.factionError)}. Your API key needs a higher access level to read faction data — create a <b>Limited Access</b> key in
+      <a href="https://www.torn.com/preferences.php#tab=api" target="_blank" rel="noopener">Torn → Settings → API keys</a> and paste it in Settings. All Torn data stays in your browser.</div></div>
+    </div>`;
+  } else if(state.factionless){
+    facHtml = `<div class="card faction">
+      <div class="femblem">🏰</div>
+      <div><div class="fname">No faction <span class="chip">live</span></div>
+      <div class="fsub">You're not in a faction right now</div></div>
+    </div>`;
+  } else {
+    facHtml = `<div class="card faction">
+      <div class="femblem">🏰</div>
+      <div><div class="fname">Loading faction…</div></div>
     </div>`;
   }
   $("factionBox").innerHTML = facHtml;
@@ -1558,6 +1592,15 @@ function renderActPreview(){
 /* ---------- settings ---------- */
 const ACCENTS = [["amber","#f5a524"],["ember","#ff6b4a"],["jade","#2fbf71"],["violet","#8b5cf6"],["ice","#38bdf8"]];
 function renderSettings(){
+  if(state.mode === "live" && state.caps){
+    const c = state.caps;
+    $("capsRow").hidden = false;
+    $("capsTxt").innerHTML =
+      `${c.basic ? "✅" : "⛔"} profile &amp; bars · ${c.money ? "✅" : "⛔"} cash &amp; networth · ${c.stats ? "✅" : "⛔"} career stats · ${c.faction ? "✅" : "⛔"} faction` +
+      ` — ⛔ items need a higher key level (Limited/Full) from Torn → Settings → API keys`;
+  } else {
+    $("capsRow").hidden = true;
+  }
   document.querySelectorAll("[data-mode]").forEach(b => b.classList.toggle("active", b.dataset.mode === settings.mode));
   document.querySelectorAll("[data-theme-val]").forEach(b => b.classList.toggle("active", b.dataset.theme_val === settings.theme || b.dataset.themeVal === settings.theme));
   $("setKey").value = settings.apiKey || "";
@@ -1968,7 +2011,7 @@ function setMode(m){
     state.faction = null;
     state.itemCache = null;
     state.items = demoItems();
-    state.statsLoaded = false; state.statsError = null;
+    state.statsLoaded = false; state.statsError = null; state.factionError = null; state.factionless = false; state.caps = null;
     state.notified = { energy:false, flight:false, drug:false, medical:false, booster:false };
     state.lastUpdated = Date.now();
     renderMode(); renderAll();
@@ -1980,7 +2023,7 @@ function setMode(m){
     if(liveTimer) clearTimeout(liveTimer);
     state.user = demoUser(); state.faction = demoFaction();
     state.items = demoItems(); state.itemCache = null;
-    state.statsLoaded = false; state.statsError = null;
+    state.statsLoaded = false; state.statsError = null; state.factionError = null; state.factionless = false; state.caps = null;
     state.lastUpdated = Date.now();
     renderMode(); renderAll();
     toast("🟡 Demo mode — simulated player", "ok");
@@ -2011,7 +2054,7 @@ function init(){
     state.faction = null;
     state.itemCache = null;
     state.items = demoItems();
-    state.statsLoaded = false; state.statsError = null;
+    state.statsLoaded = false; state.statsError = null; state.factionError = null; state.factionless = false; state.caps = null;
     renderAll();
     loadLive();
   }
