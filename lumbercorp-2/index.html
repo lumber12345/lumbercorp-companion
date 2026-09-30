@@ -610,13 +610,6 @@
             <button data-mode="live">Live</button>
           </div>
         </div>
-        <div class="setrow">
-          <div style="min-width:150px"><div class="st">Rank Wars proxy</div><div class="sd">URL of your deployed <a href="https://github.com/lumber12345/rankwars" target="_blank" rel="noopener">rankwars</a> app — powers the Rank Wars tab</div></div>
-          <div class="keyrow">
-            <input type="text" id="setRwProxy" placeholder="https://torn-rank-wars.onrender.com" autocomplete="off">
-            <button class="btn sm" id="btnSetRwProxy">Save</button>
-          </div>
-        </div>
         <div class="setrow" id="capsRow" hidden>
           <div><div class="st">Key access detected</div><div class="sd" id="capsTxt"></div></div>
         </div>
@@ -793,7 +786,7 @@ function flagEmoji(cc){
 }
 
 /* ---------- settings ---------- */
-const APP_VERSION = "2.3.3";
+const APP_VERSION = "2.3.4";
 const DEFAULT_SETTINGS = {
   mode: "demo", apiKey: "", refresh: 60,
   theme: "dark", accent: "amber",
@@ -1732,7 +1725,6 @@ function renderSettings(){
   document.querySelectorAll("[data-theme-val]").forEach(b => b.classList.toggle("active", b.dataset.theme_val === settings.theme || b.dataset.themeVal === settings.theme));
   $("setKey").value = settings.apiKey || "";
   $("setRefresh").value = String(settings.refresh);
-  $("setRwProxy").value = settings.rwProxy || "";
   $("tglEnergy").checked = !!settings.notifEnergy;
   $("tglFlight").checked = !!settings.notifFlight;
   $("tglCooldown").checked = !!settings.notifCooldown;
@@ -2350,12 +2342,6 @@ function wire(){
   $("setRefresh").addEventListener("change", e => {
     settings.refresh = Number(e.target.value); saveSettings(); scheduleLive();
   });
-  const saveRwProxy = () => {
-    settings.rwProxy = ($("setRwProxy").value || "").trim().replace(/\/$/, "");
-    saveSettings(); toast(settings.rwProxy ? "Rank Wars proxy saved" : "Rank Wars proxy cleared", "ok");
-  };
-  $("btnSetRwProxy").addEventListener("click", saveRwProxy);
-  $("setRwProxy").addEventListener("keydown", e => { if(e.key === "Enter") saveRwProxy(); });
   document.querySelectorAll("[data-theme-val]").forEach(b =>
     b.addEventListener("click", () => {
       settings.theme = b.dataset.themeVal; saveSettings(); applyAppearance(); renderSettings();
@@ -2406,7 +2392,7 @@ function wire(){
   $("btnRwRefresh").addEventListener("click", () => rwLoad());
   $("btnRwProxy").addEventListener("click", () => {
     settings.rwProxy = ($("rwProxyInput").value || "").trim().replace(/\/$/, "");
-    saveSettings(); $("setRwProxy").value = settings.rwProxy;
+    saveSettings();
     $("rwSetup").hidden = !!settings.rwProxy && state.mode === "live";
     rwLoad();
     toast(settings.rwProxy ? "⚔️ Proxy set — loading live wars" : "Proxy URL required", settings.rwProxy ? "ok" : "warn");
