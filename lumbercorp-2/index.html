@@ -996,6 +996,13 @@ async function tornUser(selections){
   if(!key) { const e = new Error("No API key set"); e.code = -1; throw e; }
   return tornFetch(`${API}/user/?selections=${selections}&key=${encodeURIComponent(key)}&comment=lumbercorp2`);
 }
+/* Faction endpoint (leader/co-leader keys or user keys with Faction Access).
+   Fails soft — most personal keys won't have it. */
+async function tornFaction(selections){
+  const key = (settings.apiKey || "").trim();
+  if(!key) { const e = new Error("No API key set"); e.code = -1; throw e; }
+  return tornFetch(`${API}/faction/?selections=${selections}&key=${encodeURIComponent(key)}&comment=lumbercorp2`);
+}
 
 /* Poll live data. Basic bars/cooldowns/profile/money work with any key;
    personalstats & faction need higher access and fail soft. */
@@ -1034,8 +1041,36 @@ async function loadLive(){
   }catch(e){ state.statsLoaded = false; state.statsError = describeApiError(e); }
   try{
     const f = await tornUser("faction");
-    if(f && f.faction) state.faction = f.faction;
-  }catch(e){ /* faction needs higher key access — leave blank */ }
+    const raw = f && f.faction;
+    if(raw && raw.faction_id){
+      /* user selection returns { faction_id, faction_name, faction_tag,
+         days_in_faction } — normalize to our display shape */
+      state.faction = {
+        name: raw.faction_name || null,
+        tag: raw.faction_tag || null,
+        age: raw.days_in_faction ?? null,
+        leader: null, respect: null, members: null, best_chain: null
+      };
+      /* Enrich from the faction endpoint when the key has Faction Access
+         (adds leader, respect, member count, best chain). Fails soft. */
+      try{
+        const fb = await tornFaction("basic,members");
+        if(fb && fb.ID){
+          state.faction = {
+            name: fb.name || state.faction.name,
+            tag: fb.tag || state.faction.tag,
+            leader: fb.leader || null,
+            respect: fb.respect ?? null,
+            age: fb.age ?? state.faction.age,
+            best_chain: fb.best_chain ?? null,
+            members: fb.members ? Object.keys(fb.members).length : null
+          };
+        }
+      }catch(e2){}
+    } else {
+      state.faction = null;   // factionless (faction_id 0)
+    }
+  }catch(e){ state.faction = null; }
   renderAll();
   scheduleLive();
 }
@@ -1136,7 +1171,9 @@ function renderDashboard(){
   const u = state.user;
   $("idAvatar").textContent = (u.name || "?").charAt(0).toUpperCase();
   $("idName").textContent = u.name || "—";
-  $("idTag").textContent = (state.faction && state.faction.tag) ? state.faction.tag : "—";
+  const ftag = state.faction && state.faction.tag;
+  $("idTag").textContent = ftag || "";
+  $("idTag").hidden = !ftag;
   $("idLevel").textContent = "Level " + (u.level ?? "—");
   $("idRank").textContent = u.rank || "—";
   const st = u.status || {};
@@ -1460,17 +1497,32 @@ function renderAbroad(){
 
 /* ---------- stats ---------- */
 function renderStats(){
-  const f = state.faction || {};
-  $("factionBox").innerHTML = `<div class="card faction">
-    <div class="femblem">🏰</div>
-    <div><div class="fname">${escHtml(f.name || "—")} <span class="chip accent">${escHtml(f.tag || "")}</span></div>
-    <div class="fsub">Led by ${escHtml(f.leader || "—")} · ${fmtInt(f.age)} days old</div></div>
-    <div class="fstats">
-      <div><small>Respect</small><b>${fmtInt(f.respect)}</b></div>
-      <div><small>Members</small><b>${fmtInt(f.members)}</b></div>
-      <div><small>Best chain</small><b>${fmtInt(f.best_chain)}</b></div>
-    </div>
-  </div>`;
+  const f = state.faction;
+  const isDemo = state.mode === "demo";
+  let facHtml;
+  if(!f || !f.name){
+    facHtml = `<div class="card faction">
+      <div class="femblem">🏰</div>
+      <div><div class="fname">No faction ${isDemo ? '<span class="chip warn">demo</span>' : ""}</div>
+      <div class="fsub">${isDemo ? "" : "You're factionless — or your key lacks Faction Access for full details"}</div></div>
+    </div>`;
+  } else {
+    const stats = [];
+    if(f.respect != null)  stats.push(["Respect", fmtInt(f.respect)]);
+    if(f.members != null)  stats.push(["Members", fmtInt(f.members)]);
+    if(f.best_chain != null) stats.push(["Best chain", fmtInt(f.best_chain)]);
+    if(f.age != null)      stats.push([isDemo ? "Age" : "Days in faction", fmtInt(f.age) + (isDemo ? "" : "d")]);
+    const sub = isDemo
+      ? `Led by ${escHtml(f.leader || "—")} · ${fmtInt(f.age)} days old`
+      : (f.leader ? `Led by ${escHtml(f.leader)}` : (f.age != null ? `Member for ${fmtInt(f.age)} days` : "Live faction data"));
+    facHtml = `<div class="card faction">
+      <div class="femblem">🏰</div>
+      <div><div class="fname">${escHtml(f.name)} ${f.tag ? `<span class="chip accent">${escHtml(f.tag)}</span>` : ""} ${isDemo ? '<span class="chip warn">demo</span>' : ""}</div>
+      <div class="fsub">${sub}</div></div>
+      ${stats.length ? `<div class="fstats">${stats.map(([l, v]) => `<div><small>${l}</small><b>${v}</b></div>`).join("")}</div>` : ""}
+    </div>`;
+  }
+  $("factionBox").innerHTML = facHtml;
   const ps = state.user.personalstats || {};
   $("statsGrid").innerHTML = STAT_DEFS.map(s => `
     <div class="card stat"><div class="sl">${s.icon} ${s.label}</div>
