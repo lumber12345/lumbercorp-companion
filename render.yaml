@@ -1,28 +1,9 @@
-# LumberCorp 2.0 — Render Blueprint
-# Deploys both services in one click (New → Blueprint → this repo):
-#   1. lumbercorp2        — static PWA (this repo's lumbercorp-2/)
-#   2. lumbercorp2-proxy  — tiny Torn v2 proxy (powers the Rank Wars tab)
-#
-# Deploy static-only: delete the proxy service block, then the Rank Wars tab
-# runs in demo mode until you paste any rankwars-compatible proxy URL in-app.
-
 services:
   - type: web
-    name: lumbercorp2-proxy
-    runtime: node
-    plan: free
-    buildCommand: echo "zero dependencies - nothing to build"
-    startCommand: node proxy/server.js
-    healthCheckPath: /api/ping
-    envVars:
-      - key: NODE_VERSION
-        value: "20"
-
-  - type: web
-    name: lumbercorp2
+    name: lumbercorp-companion
     runtime: static
-    buildCommand: printf 'window.RW_PROXY_URL="%s";' "$RW_PROXY_URL" > lumbercorp-2/config.js
-    staticPublishPath: ./lumbercorp-2
+    buildCommand: ""            # no build step — plain static files
+    staticPublishPath: ./torn-companion   # folder containing index.html, manifest, sw.js, icons/
     routes:
       - type: rewrite
         source: /*
@@ -34,9 +15,3 @@ services:
       - path: /manifest.webmanifest
         name: Cache-Control
         value: no-cache
-      - path: /config.js
-        name: Cache-Control
-        value: no-cache
-    envVars:
-      - key: RW_PROXY_URL
-        sync: false   # set in dashboard to your proxy URL, e.g. https://lumbercorp2-proxy.onrender.com

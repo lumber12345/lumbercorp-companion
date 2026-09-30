@@ -814,7 +814,7 @@ function flagEmoji(cc){
 }
 
 /* ---------- settings ---------- */
-const APP_VERSION = "2.14.0";
+const APP_VERSION = "2.15.0";
 const DEFAULT_SETTINGS = {
   mode: "demo", apiKey: "", refresh: 60,
   theme: "dark", accent: "amber",
@@ -1978,8 +1978,16 @@ function bzCard(html){
     settings.bzProxy = "";
     saveSettings();
     bzViewState.src = null;
+    bzViewState.tries = 0;
     if(bzViewState.timer){ clearTimeout(bzViewState.timer); bzViewState.timer = null; }
-    toast("📡 Back to bazaar-i5o8.onrender.com", "ok");
+    toast("📡 Trying bazaar-i5o8.onrender.com…", "ok");
+    bzApplyView();
+  });
+  const t = $("btnBzTryRemote");
+  if(t) t.addEventListener("click", () => {
+    bzViewState.src = null;
+    bzViewState.tries = 0;
+    if(bzViewState.timer){ clearTimeout(bzViewState.timer); bzViewState.timer = null; }
     bzApplyView();
   });
 }
@@ -2036,6 +2044,15 @@ async function bzWake(){
   $("bzview-scan").hidden = true;
   $("bzFindWrap").hidden = true;
   bzViewState.tries++;
+  if(bzViewState.tries > 12 && bzApiBase()){
+    /* a proxy is configured (pasted or deploy-time) — switch to the built-in
+       scanner automatically so the tab keeps working without the deployment */
+    bzViewState.src = "local";
+    if(bzViewState.timer){ clearTimeout(bzViewState.timer); bzViewState.timer = null; }
+    toast("📡 Deployment unreachable — using built-in scanner via your proxy", "warn");
+    bzApplyView();
+    return;
+  }
   const waking = bzViewState.tries <= 12;
   if(waking){
     bzCard(`<div class="setrow"><div><div class="st">⏳ Waking bazaar-i5o8.onrender.com…</div>
