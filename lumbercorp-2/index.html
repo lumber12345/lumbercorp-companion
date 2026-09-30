@@ -102,6 +102,26 @@
   .clockbox{padding:4px 11px;font-size:11.5px;color:var(--faint);line-height:1.6}
   .clockbox b{color:var(--muted);font-variant-numeric:tabular-nums;font-weight:600}
 
+  /* ================= sub-tabs (inside Companion) ================= */
+  .subtabs{
+    display:flex;gap:6px;overflow-x:auto;position:sticky;top:58px;z-index:45;
+    padding:2px 2px 10px;scrollbar-width:none;
+    background:linear-gradient(180deg, var(--bg) 82%, transparent);
+  }
+  .subtabs::-webkit-scrollbar{display:none}
+  .subtabs button{
+    display:inline-flex;align-items:center;gap:6px;flex:0 0 auto;
+    background:var(--card);border:1px solid var(--border);color:var(--muted);
+    font-size:12.5px;font-weight:700;padding:8px 14px;border-radius:99px;cursor:pointer;transition:.15s;
+    position:relative;white-space:nowrap;
+  }
+  .subtabs button:hover{color:var(--text);border-color:var(--border2)}
+  .subtabs button.active{background:var(--card3);color:var(--text);border-color:var(--accent);box-shadow:0 2px 12px var(--glow)}
+  .subtabs .badge{
+    background:var(--accent);color:#1a1206;font-size:10px;font-weight:800;
+    min-width:16px;height:16px;border-radius:99px;display:grid;place-items:center;padding:0 4px;
+  }
+
   /* ================= bottom tabbar (mobile) ================= */
   .tabbar{
     display:none;position:fixed;left:0;right:0;bottom:0;z-index:60;
@@ -109,7 +129,7 @@
     backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
     border-top:1px solid var(--border);
     padding:6px 8px calc(6px + env(safe-area-inset-bottom));
-    grid-template-columns:repeat(6,1fr);gap:2px;
+    grid-template-columns:1fr;gap:2px;
   }
   .tabbar button{
     background:none;border:none;color:var(--faint);cursor:pointer;
@@ -412,12 +432,7 @@
         <small><span class="vtag">2.0</span> THE NEXT-GEN PDA</small>
       </div>
     </div>
-    <button class="navitem active" data-page="dashboard"><span class="ni">⚡</span> Dashboard</button>
-    <button class="navitem" data-page="flight"><span class="ni">✈️</span> Flight</button>
-    <button class="navitem" data-page="stats"><span class="ni">📈</span> Stats</button>
-    <button class="navitem" data-page="alerts"><span class="ni">🔔</span> Alerts <span class="badge" id="alertBadge" hidden>0</span></button>
-    <button class="navitem" data-page="companion"><span class="ni">🧭</span> Companion</button>
-    <button class="navitem" data-page="settings"><span class="ni">⚙️</span> Settings</button>
+    <button class="navitem active always" id="brandNav"><span class="ni">🧭</span> Companion</button>
     <div class="railfoot">
       <button class="modebadge" id="modeBadge" title="Toggle demo / live mode">
         <span class="dot"></span><span id="modeBadgeTxt">DEMO MODE</span>
@@ -442,6 +457,16 @@
       <button class="iconbtn" id="btnRefresh" title="Refresh data">⟳</button>
       <button class="iconbtn" id="btnTheme" title="Toggle theme">🌙</button>
     </div>
+
+    <!-- ============ SUB-TABS (inside Companion) ============ -->
+    <nav class="subtabs" id="subtabs">
+      <button class="active" data-page="dashboard"><span>⚡</span> Home</button>
+      <button data-page="flight"><span>✈️</span> Flight</button>
+      <button data-page="stats"><span>📈</span> Stats</button>
+      <button data-page="alerts"><span>🔔</span> Alerts <span class="badge" id="subBadgeAlerts" hidden>0</span></button>
+      <button data-page="companion"><span>🧰</span> Toolkit</button>
+      <button data-page="settings"><span>⚙️</span> Settings</button>
+    </nav>
 
     <!-- ============ DASHBOARD ============ -->
     <section id="page-dashboard">
@@ -695,12 +720,7 @@
 
 <!-- ================= bottom tabbar (mobile) ================= -->
 <nav class="tabbar" id="tabbar">
-  <button class="active" data-page="dashboard"><span class="ti">⚡</span>Home</button>
-  <button data-page="flight"><span class="ti">✈️</span>Flight</button>
-  <button data-page="stats"><span class="ti">📈</span>Stats</button>
-  <button data-page="alerts"><span class="ti">🔔</span>Alerts<span class="badge" id="alertBadgeM" hidden>0</span></button>
-  <button data-page="companion"><span class="ti">🧭</span>Tools</button>
-  <button data-page="settings"><span class="ti">⚙️</span>Settings</button>
+  <button class="active always"><span class="ti">🧭</span>Companion</button>
 </nav>
 
 <!-- ================= command palette ================= -->
@@ -790,7 +810,7 @@ function flagEmoji(cc){
 }
 
 /* ---------- settings ---------- */
-const APP_VERSION = "2.0.9";
+const APP_VERSION = "2.1.0";
 const DEFAULT_SETTINGS = {
   mode: "demo", apiKey: "", refresh: 60,
   theme: "dark", accent: "amber",
@@ -1020,10 +1040,9 @@ function logAct(icon, text, silent){
 }
 function renderAlertBadge(){
   const n = state.unread;
-  $("alertBadge").hidden = n === 0;
-  $("alertBadgeM").hidden = n === 0;
-  $("alertBadge").textContent = n;
-  $("alertBadgeM").textContent = n;
+  const el = $("subBadgeAlerts");
+  el.hidden = n === 0;
+  el.textContent = n;
 }
 function toast(msg, kind){
   const el = document.createElement("div");
@@ -1321,7 +1340,7 @@ const PAGES = {
   flight:    ["Flight", "Plan trips & watch abroad stock"],
   stats:     ["Stats", "Career & faction"],
   alerts:    ["Alerts", "Notifications & activity"],
-  companion: ["Companion", "Notes, timers, targets & tools"],
+  companion: ["Toolkit", "Notes, timers, targets & tools"],
   settings:  ["Settings", "Make it yours"]
 };
 function goto(page){
@@ -1329,8 +1348,9 @@ function goto(page){
   for(const p of Object.keys(PAGES)){
     $("page-" + p).hidden = p !== page;
   }
-  document.querySelectorAll(".navitem").forEach(b => b.classList.toggle("active", b.dataset.page === page));
-  document.querySelectorAll(".tabbar button").forEach(b => b.classList.toggle("active", b.dataset.page === page));
+  document.querySelectorAll(".navitem:not(.always)").forEach(b => b.classList.toggle("active", b.dataset.page === page));
+  document.querySelectorAll(".subtabs button").forEach(b => b.classList.toggle("active", b.dataset.page === page));
+  document.querySelectorAll(".tabbar button").forEach(b => b.classList.add("active"));
   $("pageTitle").textContent = PAGES[page][0];
   $("pageSub").textContent = PAGES[page][1];
   if(page === "alerts"){ state.unread = 0; renderAlertBadge(); renderActivity(); }
@@ -2094,8 +2114,9 @@ async function refreshNow(){
   $("btnRefresh").classList.remove("spin");
 }
 function wire(){
-  document.querySelectorAll(".navitem, .tabbar button").forEach(b =>
-    b.addEventListener("click", () => goto(b.dataset.page)));
+  document.querySelectorAll(".navitem, .tabbar button, .subtabs button").forEach(b =>
+    b.addEventListener("click", () => goto(b.dataset.page || "dashboard")));
+  $("brandNav").addEventListener("click", () => goto("dashboard"));
   $("btnTheme").addEventListener("click", toggleTheme);
   $("btnRefresh").addEventListener("click", refreshNow);
   $("btnSearch").addEventListener("click", openPalette);
