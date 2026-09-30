@@ -1,5 +1,5 @@
 /* LumberCorp 2.0 service worker — offline cache + installability */
-const CACHE = "lumbercorp2-shell-v1";
+const CACHE = "lumbercorp2-shell-v2";
 const ASSETS = [
   "./",
   "./index.html",

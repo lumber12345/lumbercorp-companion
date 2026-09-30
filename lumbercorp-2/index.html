@@ -1000,26 +1000,42 @@ async function tornUser(selections){
 /* Poll live data. Basic bars/cooldowns/profile/money work with any key;
    personalstats & faction need higher access and fail soft. */
 let liveTimer = null;
+/* Selections have different key-access requirements (money/networth need
+   Personal, personalstats needs Limited). Torn calls are all-or-nothing, so
+   try the fullest set first and fall back so a weaker key still populates
+   everything it CAN. */
+const LIVE_TIERS = [
+  "bars,cooldowns,profile,money,networth,travel",
+  "bars,cooldowns,profile,travel",
+  "bars,cooldowns,profile"
+];
 async function loadLive(){
   if(state.mode !== "live") return;
-  try{
-    const u = await tornUser("bars,cooldowns,profile,money,travel");
-    state.user = Object.assign({}, state.user, u);
-    state.lastUpdated = Date.now();
-  }catch(e){
-    toast("⚠️ " + escHtml(describeApiError(e)), "bad");
-    logAct("⚠️", "Live sync failed: " + describeApiError(e));
-    if(e.code === 2){ settings.mode = "demo"; state.mode = "demo"; saveSettings(); renderMode(); }
+  let u = null, lastErr = null;
+  for(const sel of LIVE_TIERS){
+    try{ u = await tornUser(sel); break; }
+    catch(e){ lastErr = e; if(e.code === 2) break; }   // bad key — stop retrying
+  }
+  if(!u){
+    const err = lastErr || new Error("Live sync failed");
+    toast("⚠️ " + escHtml(describeApiError(err)), "bad");
+    logAct("⚠️", "Live sync failed: " + describeApiError(err));
+    if(lastErr && lastErr.code === 2) setMode("demo");
     return;
   }
+  state.user = Object.assign(emptyUser(), state.user, u);
+  state.lastUpdated = Date.now();
   try{
     const ps = await tornUser("personalstats");
-    if(ps && ps.personalstats){ state.user.personalstats = ps.personalstats; state.statsLoaded = true; }
-  }catch(e){ state.statsLoaded = false; }
+    if(ps && ps.personalstats){
+      state.user.personalstats = ps.personalstats;
+      state.statsLoaded = true; state.statsError = null;
+    } else { state.statsLoaded = false; state.statsError = "empty response from Torn"; }
+  }catch(e){ state.statsLoaded = false; state.statsError = describeApiError(e); }
   try{
     const f = await tornUser("faction");
-    if(f && f.faction) state.faction = Object.assign({}, state.faction, f.faction);
-  }catch(e){}
+    if(f && f.faction) state.faction = f.faction;
+  }catch(e){ /* faction needs higher key access — leave blank */ }
   renderAll();
   scheduleLive();
 }
@@ -1147,9 +1163,9 @@ function renderBars(){
   $("barsWrap").innerHTML = BAR_META.map(([k, lbl]) => {
     const b = state.user.bars && state.user.bars[k];
     if(!b) return "";
-    const pct = Math.max(0, Math.min(100, (b.current / b.maximum) * 100));
+    const pct = b.maximum ? Math.max(0, Math.min(100, (b.current / b.maximum) * 100)) : 0;
     const eta = barETA(b);
-    const etaTxt = eta == null ? "no regen" : (pct >= 100 ? "full" : "full in " + fmtDur(eta));
+    const etaTxt = !b.maximum ? "waiting for data…" : eta == null ? "no regen" : (pct >= 100 ? "full" : "full in " + fmtDur(eta));
     return `<div class="card barcard">
       <div class="top"><span class="lbl">${lbl}</span><span class="eta">${etaTxt}</span></div>
       <div class="v"><span class="bar-cur" data-bar="${k}">${fmtInt(b.current)}</span>
@@ -1460,7 +1476,11 @@ function renderStats(){
     <div class="card stat"><div class="sl">${s.icon} ${s.label}</div>
     <div class="sv">${s.money ? fmtMoney(ps[s.key]) : fmtInt(ps[s.key])}</div></div>`).join("");
   $("statsUpdated").textContent = state.mode === "live"
-    ? (state.statsLoaded ? "personalstats loaded (Limited+ key)" : "personalstats need a Limited+ API key — showing what we have")
+    ? (state.statsLoaded
+        ? "live personalstats ✓ · updated " + timeAgo(state.lastUpdated)
+        : (state.statsError
+            ? "⚠️ career stats unavailable — " + state.statsError
+            : "loading personalstats…"))
     : "demo data — add a Torn API key in Settings for your real numbers";
 }
 
@@ -1521,7 +1541,9 @@ function renderMode(){
   const live = state.mode === "live";
   $("modeBadge").classList.toggle("live", live);
   $("modeBadgeTxt").textContent = live ? "LIVE · TORN API" : "DEMO MODE";
-  $("btnRefresh").classList.toggle("spin", false);
+  // keep the Settings segment buttons in sync the moment mode flips
+  document.querySelectorAll("[data-mode]").forEach(b =>
+    b.classList.toggle("active", b.dataset.mode === state.mode));
 }
 function renderAll(){
   renderDashboard();
@@ -1557,13 +1579,13 @@ function updateDynamic(){
     const fill = document.querySelector(`[data-fill="${k}"]`);
     const tick = document.querySelector(`[data-tick="${k}"]`);
     if(cur) cur.textContent = fmtInt(b.current);
-    if(fill) fill.style.width = Math.max(0, Math.min(100, b.current / b.maximum * 100)) + "%";
+    if(fill) fill.style.width = (b.maximum ? Math.max(0, Math.min(100, b.current / b.maximum * 100)) : 0) + "%";
     const eta = barETA(b);
-    if(tick) tick.textContent = (eta != null && b.current < b.maximum) ? "· +" + fmtDur(eta) : "";
+    if(tick) tick.textContent = (eta != null && b.maximum && b.current < b.maximum) ? "· +" + fmtDur(eta) : "";
     const card = fill && fill.closest(".barcard");
     if(card){
       const etaEl = card.querySelector(".eta");
-      if(etaEl) etaEl.textContent = eta == null ? "no regen" : (b.current >= b.maximum ? "full ✓" : "full in " + fmtDur(eta));
+      if(etaEl) etaEl.textContent = !b.maximum ? "waiting for data…" : eta == null ? "no regen" : (b.current >= b.maximum ? "full ✓" : "full in " + fmtDur(eta));
     }
   }
   // cooldowns
@@ -1857,24 +1879,58 @@ function wire(){
     location.reload();
   });
 }
+/* Blank skeleton used when entering live mode — guarantees no demo numbers
+   linger anywhere (Stats especially). */
+function emptyUser(){
+  return {
+    player_id: null, name: "…", level: null, rank: "", gender: "", status: {},
+    bars: {
+      energy: { current: 0, maximum: 0, increment: 0, interval: 0, ticktime: 0 },
+      nerve:  { current: 0, maximum: 0, increment: 0, interval: 0, ticktime: 0 },
+      happy:  { current: 0, maximum: 0, increment: 0, interval: 0, ticktime: 0 },
+      life:   { current: 0, maximum: 0, increment: 0, interval: 0, ticktime: 0 }
+    },
+    cooldowns: { drug: 0, medical: 0, booster: 0 },
+    money_onhand: null, points: null, networth: null, merits: null,
+    personalstats: null, travel: null
+  };
+}
 function setMode(m){
-  settings.mode = m; state.mode = m; saveSettings(); renderMode();
-  state.lastUpdated = Date.now();
+  if(m === state.mode) return;
   if(m === "live"){
+    // pick up the key input even if it was never blurred
+    const typed = (($("setKey") && $("setKey").value) || "").trim();
+    if(typed){ settings.apiKey = typed; saveSettings(); }
     if(!settings.apiKey){
-      toast("⚠️ Add your Torn API key in Settings first.", "warn");
+      // refuse to flip the flag — stay in demo until there's a key
+      settings.mode = "demo"; state.mode = "demo"; saveSettings(); renderMode();
+      toast("⚠️ Paste your Torn API key first (Torn → Preferences → API keys).", "warn");
       goto("settings");
+      setTimeout(() => $("setKey") && $("setKey").focus(), 60);
       return;
     }
+    settings.mode = "live"; state.mode = "live"; saveSettings();
+    state.user = emptyUser();
+    state.faction = null;
+    state.itemCache = null;
+    state.items = demoItems();
+    state.statsLoaded = false; state.statsError = null;
+    state.notified = { energy:false, flight:false, drug:false, medical:false, booster:false };
+    state.lastUpdated = Date.now();
+    renderMode(); renderAll();
     toast("🟢 Live mode — syncing with Torn…", "ok");
     logAct("🟢", "Switched to LIVE mode");
     loadLive();
   } else {
+    settings.mode = "demo"; state.mode = "demo"; saveSettings();
     if(liveTimer) clearTimeout(liveTimer);
-    state.user = demoUser(); state.faction = demoFaction(); state.items = demoItems(); state.itemCache = null;
+    state.user = demoUser(); state.faction = demoFaction();
+    state.items = demoItems(); state.itemCache = null;
+    state.statsLoaded = false; state.statsError = null;
+    state.lastUpdated = Date.now();
+    renderMode(); renderAll();
     toast("🟡 Demo mode — simulated player", "ok");
     logAct("🟡", "Switched to DEMO mode");
-    renderAll();
   }
 }
 
