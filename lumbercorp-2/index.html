@@ -416,7 +416,8 @@
       </button>
       <div class="clockbox">
         Torn <b id="clockTorn">--:--:--</b><br>
-        Local <b id="clockLocal">--:--:--</b>
+        Local <b id="clockLocal">--:--:--</b><br>
+        <span id="lcVer" title="App build"></span>
       </div>
     </div>
   </aside>
@@ -645,7 +646,7 @@
 
       <h2 class="sec">About</h2>
       <div class="card setcard" style="font-size:13px;color:var(--muted);line-height:1.7">
-        <div><b style="color:var(--text)">LumberCorp 2.0</b> <span class="chip accent">v2.0.0</span></div>
+        <div><b style="color:var(--text)">LumberCorp 2.0</b> <span class="chip accent" id="aboutVer">v2.0.0</span></div>
         <div>
           What's new over 1.0: live bar ETAs &amp; tick simulation · flight planner with landing countdown + notifications ·
           restock-cycle ticker · abroad <i>profit</i> table vs market value · ⌘K command palette · watchlists ·
@@ -755,6 +756,7 @@ function flagEmoji(cc){
 }
 
 /* ---------- settings ---------- */
+const APP_VERSION = "2.0.3";
 const DEFAULT_SETTINGS = {
   mode: "demo", apiKey: "", refresh: 60,
   theme: "dark", accent: "amber",
@@ -1989,6 +1991,9 @@ function setMode(m){
 /* ============================== INIT ============================== */
 function init(){
   applyAppearance();
+  $("lcVer").textContent = "v" + APP_VERSION;
+  $("aboutVer").textContent = "v" + APP_VERSION;
+  console.log("%c🪵 LumberCorp 2.0 v" + APP_VERSION, "font-weight:bold");
   wire();
   renderPlanner();
   renderAll();
@@ -1999,7 +2004,17 @@ function init(){
     // landed while away — surface it once per session
     logAct("🛬", `Landed in ${state.flight.dest} (while you were gone)`);
   }
-  if(state.mode === "live" && settings.apiKey) loadLive();
+  if(state.mode === "live" && settings.apiKey){
+    /* Booting in live mode: purge every demo value BEFORE the first sync.
+       If the API hiccups, we show honest blanks — never the demo faction. */
+    state.user = emptyUser();
+    state.faction = null;
+    state.itemCache = null;
+    state.items = demoItems();
+    state.statsLoaded = false; state.statsError = null;
+    renderAll();
+    loadLive();
+  }
   else scheduleLive();
   fetchYata(false);
   setInterval(() => { simTick(1); updateDynamic(); checkAlerts(); }, 1000);
