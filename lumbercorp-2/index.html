@@ -580,16 +580,7 @@
           <div class="sd">Switch to <b>Live mode</b> in Setup — the scanner then tracks every bazaar: ROI, spreads, 1 h trends and the cheapest open asks, straight from the official API.</div></div>
         </div>
       </div>
-      <div class="card setcard" id="bzScanProxy" hidden>
-        <div class="setrow">
-          <div><div class="st">📡 Scanner needs its backend</div>
-          <div class="sd">The scanner talks through the LumberCorp proxy — on Render it's wired automatically (<code>RW_PROXY_URL</code>). Running locally? Paste the proxy URL below (saved for the Bazaar tab; the Rank Wars tab is untouched).</div></div>
-        </div>
-        <div class="setrow">
-          <input type="text" id="bzProxyInput" placeholder="https://your-proxy.onrender.com" style="flex:1;min-width:220px;background:var(--card2);border:1px solid var(--border2);border-radius:10px;padding:9px 11px;font-weight:600">
-          <button class="btn sm primary" id="btnBzProxy">Save &amp; scan</button>
-        </div>
-      </div>
+      <div class="card setcard" id="bzScanProxy" hidden></div>
       <div id="bzview-scan" hidden>
         <iframe id="bzFrame" title="Torn Bazaar Scanner" src="about:blank" referrerpolicy="no-referrer"></iframe>
       </div>
@@ -823,7 +814,7 @@ function flagEmoji(cc){
 }
 
 /* ---------- settings ---------- */
-const APP_VERSION = "2.12.0";
+const APP_VERSION = "2.13.0";
 const DEFAULT_SETTINGS = {
   mode: "demo", apiKey: "", refresh: 60,
   theme: "dark", accent: "amber",
@@ -1928,7 +1919,14 @@ async function rwWake(){
 }
 function rwEnter(){ rwState.tries = 0; rwFrameOn(); }
 
-const bzViewState = { view: "scan", scanReady: false, findReady: false };
+/* ===== Bazaar — your bazaar deployment, zero setup =======================
+ * Default: embeds https://bazaar-i5o8.onrender.com (it carries its own
+ * scanner backend, so nothing to configure). A proxy pasted on this tab
+ * (settings.bzProxy) — or "Use built-in app" — switches to the vendored
+ * copy running against your proxy. Free Render instances sleep after
+ * 15 min idle, so a wake card pings and retries automatically. */
+const BZ_REMOTE = "https://bazaar-i5o8.onrender.com";
+const bzViewState = { view: "scan", src: null, tries: 0, timer: null, frameSrc: { scan: null, find: null } };
 function bzApiBase(){
   return (settings.bzProxy || settings.rwProxy || (window.RW_PROXY_URL || "")).trim().replace(/\/$/, "");
 }
@@ -1938,19 +1936,103 @@ function bzSyncEmbed(){
     if((settings.apiKey || "").trim()) localStorage.setItem("torn_bazaar_api_key", settings.apiKey.trim());
   }catch(e){ /* storage unavailable — embed asks for its own key */ }
 }
-/* Both sub-tabs embed the same Bazaar Scanner app (lumber12345/bazaar). */
+function bzSource(){
+  return (bzViewState.src === "local" || !!settings.bzProxy) ? "local" : "remote";
+}
+function bzSetFrame(which, url){
+  if(bzViewState.frameSrc[which] === url) return;
+  $(which === "scan" ? "bzFrame" : "bzFindFrame").src = url;
+  bzViewState.frameSrc[which] = url;
+}
+function bzPingRemote(){
+  return new Promise((resolve) => {
+    let done = false;
+    const t = setTimeout(() => { if(!done){ done = true; resolve(false); } }, 6000);
+    fetch(BZ_REMOTE + "/", { mode: "no-cors", cache: "no-store" })
+      .then(() => { if(!done){ done = true; clearTimeout(t); resolve(true); } })
+      .catch(() => { if(!done){ done = true; clearTimeout(t); resolve(false); } });
+  });
+}
+function bzCard(html){
+  const c = $("bzScanProxy");
+  if(html == null){ c.hidden = true; c.innerHTML = ""; return; }
+  c.hidden = false;
+  c.innerHTML = html;
+  const s = $("btnBzProxy");
+  if(s) s.addEventListener("click", () => {
+    settings.bzProxy = ($("bzProxyInput").value || "").trim().replace(/\/$/, "");
+    saveSettings();
+    toast(settings.bzProxy ? "📡 Proxy set — built-in scanner connecting" : "Proxy URL required", settings.bzProxy ? "ok" : "warn");
+    bzApplyView();
+  });
+  const r = $("btnBzRetry");
+  if(r) r.addEventListener("click", () => { bzViewState.tries = 0; bzApplyView(); });
+  const b = $("btnBzLocal");
+  if(b) b.addEventListener("click", () => {
+    if(bzViewState.timer){ clearTimeout(bzViewState.timer); bzViewState.timer = null; }
+    bzViewState.src = "local";
+    bzApplyView();
+  });
+}
 function bzApplyView(){
   const v = bzViewState.view;
-  const ready = state.mode === "live" && !!bzApiBase();
   $("bzScanNote").hidden = state.mode === "live";
-  $("bzScanProxy").hidden = !(state.mode === "live" && !bzApiBase());
-  $("bzview-scan").hidden = v !== "scan" || !ready;
   $("bzview-find").hidden = v !== "find";
-  $("bzFindWrap").hidden = v !== "find" || !ready;
-  if(!ready) return;
-  bzSyncEmbed();
-  if(v === "scan" && !bzViewState.scanReady){ $("bzFrame").src = "bazaar/index.html"; bzViewState.scanReady = true; }
-  if(v === "find" && !bzViewState.findReady){ $("bzFindFrame").src = "bazaar/index.html"; bzViewState.findReady = true; }
+  $("bzFindWrap").hidden = true;
+  if(state.mode !== "live"){
+    $("bzScanProxy").hidden = true;
+    $("bzview-scan").hidden = true;
+    if(bzViewState.timer){ clearTimeout(bzViewState.timer); bzViewState.timer = null; }
+    return;
+  }
+  if(bzSource() === "local"){
+    if(bzViewState.timer){ clearTimeout(bzViewState.timer); bzViewState.timer = null; }
+    if(!bzApiBase()){
+      $("bzview-scan").hidden = true;
+      bzCard(`<div class="setrow">
+        <div><div class="st">📡 Built-in scanner needs a backend</div>
+        <div class="sd">Paste the LumberCorp proxy URL — on Render it's wired automatically via <code>RW_PROXY_URL</code>. Saved for the Bazaar tab only; Rank Wars is untouched.</div></div>
+      </div>
+      <div class="setrow">
+        <input type="text" id="bzProxyInput" placeholder="https://your-proxy.onrender.com" style="flex:1;min-width:220px;background:var(--card2);border:1px solid var(--border2);border-radius:10px;padding:9px 11px;font-weight:600">
+        <button class="btn sm primary" id="btnBzProxy">Save &amp; scan</button>
+      </div>`);
+      return;
+    }
+    $("bzScanProxy").hidden = true;
+    $("bzview-scan").hidden = v !== "scan";
+    $("bzFindWrap").hidden = v !== "find";
+    bzSyncEmbed();
+    bzSetFrame(v, "bazaar/index.html");
+    return;
+  }
+  /* remote deployment */
+  $("bzview-scan").hidden = true;
+  bzWake();
+}
+async function bzWake(){
+  const up = await bzPingRemote();
+  if(state.mode !== "live" || bzSource() !== "remote") return;
+  const v = bzViewState.view;
+  if(up){
+    if(bzViewState.timer){ clearTimeout(bzViewState.timer); bzViewState.timer = null; }
+    $("bzScanProxy").hidden = true;
+    $("bzview-scan").hidden = v !== "scan";
+    $("bzFindWrap").hidden = v !== "find";
+    bzSetFrame(v, BZ_REMOTE + "/");
+    return;
+  }
+  $("bzview-scan").hidden = true;
+  $("bzFindWrap").hidden = true;
+  bzViewState.tries++;
+  const waking = bzViewState.tries <= 12;
+  bzCard(`<div class="setrow"><div><div class="st">${waking ? "⏳ Waking bazaar-i5o8.onrender.com…" : "🔴 bazaar-i5o8.onrender.com is unreachable"}</div>
+  <div class="sd">${waking ? "Free Render instances sleep after 15 minutes idle — the first load can take up to a minute. Retrying automatically…" : "Check that the deployment is running on Render, or use the built-in scanner with your own proxy instead."}</div></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" id="btnBzRetry">⟳ Retry</button>${waking ? "" : '<button class="btn sm primary" id="btnBzLocal">Use built-in app</button>'}</div></div>`);
+  if(waking){
+    if(bzViewState.timer) clearTimeout(bzViewState.timer);
+    bzViewState.timer = setTimeout(() => { if(state.page === "bazaar" && state.mode === "live" && bzSource() === "remote") bzWake(); }, 5000);
+  }
 }
 function bzSetView(v){
   if(!["scan", "find"].includes(v)) return;
@@ -2282,12 +2364,6 @@ function wire(){
     saveSettings();
     rwFrameOn();
     toast(settings.rwProxy ? "⚔️ Proxy set — loading live wars" : "Proxy URL required", settings.rwProxy ? "ok" : "warn");
-  });
-  $("btnBzProxy").addEventListener("click", () => {
-    settings.bzProxy = ($("bzProxyInput").value || "").trim().replace(/\/$/, "");
-    saveSettings();
-    bzApplyView();
-    toast(settings.bzProxy ? "📡 Proxy set — scanner connecting" : "Proxy URL required", settings.bzProxy ? "ok" : "warn");
   });
 }
 /* Blank skeleton used when entering live mode — guarantees no demo numbers
