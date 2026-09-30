@@ -115,7 +115,7 @@
   .bz-subtabs button:hover{color:var(--text);border-color:var(--border2)}
   .bz-subtabs button.active{background:var(--card3);color:var(--text);border-color:var(--accent);box-shadow:0 2px 12px var(--glow)}
   .bz-subtabs .live-dot{width:7px;height:7px;border-radius:50%;background:var(--ok);animation:pulse 2s infinite}
-  #bzFrame,#bzRwFrame{width:100%;height:clamp(560px,80vh,1100px);border:1px solid var(--border2);border-radius:14px;background:#0b0e14;display:block;margin-top:12px}
+  #bzFrame{width:100%;height:clamp(560px,80vh,1100px);border:1px solid var(--border2);border-radius:14px;background:#0b0e14;display:block;margin-top:12px}
 
   /* ================= bazaar finder ================= */
   .bz-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 2px 12px}
@@ -587,7 +587,6 @@
       <nav class="bz-subtabs" id="bzSubTabs">
         <button class="active" data-bzview="scan"><span class="live-dot"></span> Scanner</button>
         <button data-bzview="find">⚡ Quick Find</button>
-        <button data-bzview="rwar">⚔️ Rank Wars</button>
       </nav>
       <div class="card setcard" id="bzScanNote" hidden>
         <div class="setrow">
@@ -603,10 +602,6 @@
       </div>
       <div id="bzview-scan" hidden>
         <iframe id="bzFrame" title="Torn Bazaar Scanner" src="about:blank" referrerpolicy="no-referrer"></iframe>
-      </div>
-      <div class="card setcard" id="bzRwCard" hidden></div>
-      <div id="bzRwWrap" hidden>
-        <iframe id="bzRwFrame" title="Rank Wars app — rankwars" src="about:blank" referrerpolicy="no-referrer"></iframe>
       </div>
       <div id="bzview-find" hidden>
       <div class="card setcard" id="bzNeedKey" hidden>
@@ -849,7 +844,7 @@ function flagEmoji(cc){
 }
 
 /* ---------- settings ---------- */
-const APP_VERSION = "2.10.0";
+const APP_VERSION = "2.9.0";
 const DEFAULT_SETTINGS = {
   mode: "demo", apiKey: "", refresh: 60,
   theme: "dark", accent: "amber",
@@ -2109,62 +2104,12 @@ function bzScanOn(){
     if(!bzViewState.frameReady){ $("bzFrame").src = "bazaar/index.html"; bzViewState.frameReady = true; }
   }
 }
-/* ---- Bazaar ▸ Rank Wars sub-tab: the rankwars app, independent embed ----
- * Same behaviour as the Rank Wars tab: rankwars.onrender.com by default
- * (wake-aware), or the built-in vendored app when a custom proxy is set. */
-const bzRwState = { frameReady: false, src: null, tries: 0, timer: null };
-function bzRwStatus(html){
-  const c = $("bzRwCard");
-  if(html == null){ c.hidden = true; c.innerHTML = ""; return; }
-  c.hidden = false;
-  c.innerHTML = html;
-  const r = $("bzRwRetry");
-  if(r) r.addEventListener("click", () => { bzRwState.tries = 0; bzRwOn(); });
-  const b = $("bzRwLocal");
-  if(b) b.addEventListener("click", () => { if(bzRwState.timer){ clearTimeout(bzRwState.timer); bzRwState.timer = null; } bzRwOn(true); });
-}
-async function bzRwOn(forceLocal){
-  const local = forceLocal === true || !!rwEffectiveProxy();
-  if(local){
-    if(bzRwState.timer){ clearTimeout(bzRwState.timer); bzRwState.timer = null; }
-    $("bzRwCard").hidden = true;
-    rwSyncEmbed();
-    $("bzRwWrap").hidden = false;
-    if(!bzRwState.frameReady || bzRwState.src !== "local"){ $("bzRwFrame").src = "rankwars/index.html"; bzRwState.frameReady = true; bzRwState.src = "local"; }
-    return;
-  }
-  $("bzRwWrap").hidden = true;
-  const up = await rwPingRemote();
-  if(bzViewState.view !== "rwar" || state.page !== "bazaar") return;
-  if(up){
-    if(bzRwState.timer){ clearTimeout(bzRwState.timer); bzRwState.timer = null; }
-    $("bzRwCard").hidden = true;
-    $("bzRwWrap").hidden = false;
-    if(!bzRwState.frameReady || bzRwState.src !== "remote"){ $("bzRwFrame").src = RW_REMOTE + "/"; bzRwState.frameReady = true; bzRwState.src = "remote"; }
-    return;
-  }
-  bzRwState.tries++;
-  const waking = bzRwState.tries <= 12;
-  bzRwStatus(`<div class="setrow"><div><div class="st">${waking ? "⏳ Waking rankwars.onrender.com…" : "🔴 rankwars.onrender.com is unreachable"}</div>
-  <div class="sd">${waking ? "Free Render instances sleep after 15 minutes idle — the first load can take up to a minute. Retrying automatically…" : "Check that the deployment is running on Render, or use the built-in Rank Wars app with your own proxy instead."}</div></div>
-  <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" id="bzRwRetry">⟳ Retry</button>${waking ? "" : '<button class="btn sm primary" id="bzRwLocal">Use built-in app</button>'}</div></div>`);
-  if(waking){
-    if(bzRwState.timer) clearTimeout(bzRwState.timer);
-    bzRwState.timer = setTimeout(() => { if(state.page === "bazaar" && bzViewState.view === "rwar") bzRwOn(); }, 5000);
-  }
-}
 function bzSetView(v){
-  if(!["scan", "find", "rwar"].includes(v)) return;
+  if(!["scan", "find"].includes(v)) return;
   bzViewState.view = v;
   document.querySelectorAll("#bzSubTabs button").forEach(b =>
     b.classList.toggle("active", b.dataset.bzview === v));
   $("bzview-find").hidden = v !== "find";
-  if(v === "rwar"){ bzRwOn(); }
-  else{
-    $("bzRwWrap").hidden = true;
-    $("bzRwCard").hidden = true;
-    if(bzRwState.timer){ clearTimeout(bzRwState.timer); bzRwState.timer = null; }
-  }
   if(v === "scan") bzScanOn();
 }
 function bzEnter(){
@@ -2173,7 +2118,6 @@ function bzEnter(){
   if(bzState.item) bzRender();
   bzScanOn();
   if(bzViewState.view === "find") $("bzview-find").hidden = false;
-  if(bzViewState.view === "rwar") bzRwOn();
 }
 /* ============================== TICKER ============================== */
 /* Advance bars client-side each second (works for demo & between live polls). */
