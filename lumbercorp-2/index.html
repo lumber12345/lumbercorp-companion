@@ -109,7 +109,7 @@
     backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
     border-top:1px solid var(--border);
     padding:6px 8px calc(6px + env(safe-area-inset-bottom));
-    grid-template-columns:repeat(6,1fr);gap:2px;
+    grid-template-columns:repeat(7,1fr);gap:2px;
   }
   .tabbar button{
     background:none;border:none;color:var(--faint);cursor:pointer;
@@ -338,6 +338,26 @@
   .fitem .ftm{font-size:11px;color:var(--faint);margin-top:1px}
   .empty{padding:26px;text-align:center;color:var(--faint);font-size:13px;border:1px dashed var(--border2);border-radius:var(--radius)}
 
+  /* ================= companion ================= */
+  .compgrid{display:grid;gap:12px}
+  @media(min-width:820px){.compgrid{grid-template-columns:1fr 1fr}}
+  .trow,.prow{display:flex;align-items:center;gap:11px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:12px}
+  .trow.done{opacity:.7}
+  .trow .ti2,.prow .pi2{font-size:17px;flex:0 0 auto}
+  .trow .tl2,.prow .tl2{font-size:13.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .trow .ts2,.prow .ts2{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+  #compNotes{width:100%;min-height:150px;background:var(--card2);border:1px solid var(--border2);border-radius:11px;padding:12px;font-size:13.5px;line-height:1.55;resize:vertical;outline:none;font:inherit}
+  #compNotes:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--glow)}
+  .llinkgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:9px}
+  .llink{display:flex;gap:10px;align-items:center;text-decoration:none;color:var(--text);background:var(--card);border:1px solid var(--border);border-radius:12px;padding:11px 12px;transition:.15s}
+  .llink:hover{border-color:var(--accent);transform:translateY(-1px)}
+  .llink .li2{font-size:19px}
+  .llink .ln{font-size:13px;font-weight:800}
+  .llink .ld{font-size:10.5px;color:var(--faint)}
+  .timerform,.trackform{display:flex;gap:7px;flex-wrap:wrap}
+  .timerform input,.trackform input{background:var(--card2);border:1px solid var(--border2);border-radius:10px;padding:9px 11px;font-size:13px;font-weight:600;outline:none}
+  .timerform input:focus,.trackform input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--glow)}
+
   /* ================= settings ================= */
   .setcard{padding:16px;display:flex;flex-direction:column;gap:12px}
   .setrow{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
@@ -417,6 +437,7 @@
     <button class="navitem" data-page="market"><span class="ni">💱</span> Market</button>
     <button class="navitem" data-page="stats"><span class="ni">📈</span> Stats</button>
     <button class="navitem" data-page="alerts"><span class="ni">🔔</span> Alerts <span class="badge" id="alertBadge" hidden>0</span></button>
+    <button class="navitem" data-page="companion"><span class="ni">🧭</span> Companion</button>
     <button class="navitem" data-page="settings"><span class="ni">⚙️</span> Settings</button>
     <div class="railfoot">
       <button class="modebadge" id="modeBadge" title="Toggle demo / live mode">
@@ -586,6 +607,53 @@
     </section>
 
     <!-- ============ SETTINGS ============ -->
+    <!-- ============ COMPANION ============ -->
+    <section id="page-companion" hidden>
+      <div class="compgrid">
+        <div>
+          <h2 class="sec">Quick Notes</h2>
+          <div class="card" style="padding:12px">
+            <textarea id="compNotes" placeholder="Targets to hit, items to buy, who owes you money…"></textarea>
+            <div style="font-size:10.5px;color:var(--faint);margin-top:6px">saves automatically · stored only in this browser</div>
+          </div>
+        </div>
+        <div>
+          <h2 class="sec">Timers</h2>
+          <div class="card" style="padding:12px">
+            <div class="timerform">
+              <input type="text" id="timerLabel" placeholder="Label (e.g. Loot uncle)" style="flex:1.4;min-width:130px">
+              <input type="number" id="timerMins" min="1" value="15" style="width:74px" title="minutes">
+              <button class="btn sm primary" id="btnTimerAdd">Start</button>
+            </div>
+            <div style="display:flex;gap:5px;margin-top:8px;flex-wrap:wrap" id="timerQuick">
+              <button class="btn sm" data-quickmin="5">5m</button>
+              <button class="btn sm" data-quickmin="15">15m</button>
+              <button class="btn sm" data-quickmin="30">30m</button>
+              <button class="btn sm" data-quickmin="60">1h</button>
+              <button class="btn sm" data-quickmin="120">2h</button>
+            </div>
+            <div id="compTimerList" style="display:flex;flex-direction:column;gap:7px;margin-top:10px"></div>
+          </div>
+        </div>
+        <div>
+          <h2 class="sec">Player Tracker</h2>
+          <div class="card" style="padding:12px">
+            <div class="trackform">
+              <input type="text" id="trackName" placeholder="Name" style="flex:1;min-width:90px">
+              <input type="text" inputmode="numeric" id="trackId" placeholder="ID" style="width:86px">
+              <input type="text" id="trackNote" placeholder="Note" style="flex:1.3;min-width:110px">
+              <button class="btn sm primary" id="btnTrackAdd">Add</button>
+            </div>
+            <div id="compTrackerList" style="display:flex;flex-direction:column;gap:7px;margin-top:10px"></div>
+          </div>
+        </div>
+        <div>
+          <h2 class="sec">Community Tools</h2>
+          <div class="llinkgrid" id="compLinks"></div>
+        </div>
+      </div>
+    </section>
+
     <section id="page-settings" hidden>
       <h2 class="sec">Data Source</h2>
       <div class="card setcard">
@@ -682,6 +750,7 @@
   <button data-page="market"><span class="ti">💱</span>Market</button>
   <button data-page="stats"><span class="ti">📈</span>Stats</button>
   <button data-page="alerts"><span class="ti">🔔</span>Alerts<span class="badge" id="alertBadgeM" hidden>0</span></button>
+  <button data-page="companion"><span class="ti">🧭</span>Tools</button>
   <button data-page="settings"><span class="ti">⚙️</span>Settings</button>
 </nav>
 
@@ -772,7 +841,7 @@ function flagEmoji(cc){
 }
 
 /* ---------- settings ---------- */
-const APP_VERSION = "2.0.7";
+const APP_VERSION = "2.0.8";
 const DEFAULT_SETTINGS = {
   mode: "demo", apiKey: "", refresh: 60,
   theme: "dark", accent: "amber",
@@ -1307,6 +1376,7 @@ const PAGES = {
   market:    ["Market", "Item DB & abroad profit"],
   stats:     ["Stats", "Career & faction"],
   alerts:    ["Alerts", "Notifications & activity"],
+  companion: ["Companion", "Notes, timers, targets & tools"],
   settings:  ["Settings", "Make it yours"]
 };
 function goto(page){
@@ -1322,6 +1392,7 @@ function goto(page){
   if(page === "flight"){ renderPlanner(); renderActiveFlight(); renderDestGrid(); renderYataStatus(); }
   if(page === "market"){ renderMarket(); renderAbroad(); }
   if(page === "stats"){ renderStats(); }
+  if(page === "companion"){ renderCompanion(); }
   if(page === "settings"){ renderSettings(); }
   renderAll(); // cheap refresh of dynamic bits for the new page
   window.scrollTo({ top: 0 });
@@ -1864,6 +1935,103 @@ function renderAll(){
   renderMode();
 }
 
+/* ============================== COMPANION ============================== */
+let compNotes = store.get("lc2_notes", "");
+let compTimers = store.get("lc2_timers", []);     // {id, label, ends, notified}
+let compTracker = store.get("lc2_tracker", []);   // {id, name, note, added}
+let compNotesT = null;
+const LINKS = [
+  { name:"YATA",          url:"https://yata.yt",                    desc:"Abroad stock & travel",      icon:"🌏" },
+  { name:"TornStats",     url:"https://www.tornstats.com",          desc:"Spy reports & stats",        icon:"📊" },
+  { name:"TornTools",     url:"https://www.torntools.com",          desc:"Browser extension pack",     icon:"🧰" },
+  { name:"Torn Wiki",     url:"https://wiki.torn.com",              desc:"Community knowledge base",   icon:"📚" },
+  { name:"Prombot",       url:"https://prombot.co.uk",              desc:"Loot timing & alerts",       icon:"🤖" },
+  { name:"Torn Exchange", url:"https://www.tornexchange.com",       desc:"Item prices & trading",      icon:"💱" }
+];
+function renderCompanion(){
+  const ta = $("compNotes");
+  if(document.activeElement !== ta) ta.value = compNotes;
+  const tl = $("compTimerList");
+  if(!compTimers.length){
+    tl.innerHTML = `<div class="empty" style="padding:16px">No timers running. Set one — loot spawn, chain, refill…</div>`;
+  } else {
+    tl.innerHTML = compTimers.map(t => {
+      const left = Math.floor((t.ends - Date.now())/1000);
+      const done = left <= 0;
+      return `<div class="trow ${done ? "done" : ""}">
+        <span class="ti2">${done ? "✅" : "⏳"}</span>
+        <div style="min-width:0"><div class="tl2">${escHtml(t.label)}</div>
+        <div class="ts2 num" data-timer="${t.id}">${done ? "done" : fmtCountdown(left)}</div></div>
+        <span class="spacer"></span>
+        <button class="iconbtn" data-deltimer="${t.id}" title="Remove">✕</button>
+      </div>`;
+    }).join("");
+    tl.querySelectorAll("[data-deltimer]").forEach(b => b.addEventListener("click", () => {
+      compTimers = compTimers.filter(t => String(t.id) !== b.dataset.deltimer);
+      store.set("lc2_timers", compTimers); renderCompanion();
+    }));
+  }
+  const tr = $("compTrackerList");
+  tr.innerHTML = compTracker.length ? compTracker.map(p => `
+    <div class="prow">
+      <span class="pi2">🎯</span>
+      <div style="min-width:0;flex:1"><div class="tl2"><a href="https://www.torn.com/profiles.php?XID=${encodeURIComponent(p.id)}" target="_blank" rel="noopener">${escHtml(p.name)}</a> <span class="chip" style="font-size:9.5px;padding:1px 5px">${escHtml(String(p.id))}</span></div>
+      <div class="ts2">${escHtml(p.note || "")}</div></div>
+      <button class="iconbtn" data-deltrack="${p.id}" title="Remove">✕</button>
+    </div>`).join("")
+    : `<div class="empty" style="padding:16px">Track targets, scammer IDs, friends — with a note each.</div>`;
+  tr.querySelectorAll("[data-deltrack]").forEach(b => b.addEventListener("click", () => {
+    compTracker = compTracker.filter(p => String(p.id) !== b.dataset.deltrack);
+    store.set("lc2_tracker", compTracker); renderCompanion();
+  }));
+  $("compLinks").innerHTML = LINKS.map(l => `
+    <a class="llink" href="${escHtml(l.url)}" target="_blank" rel="noopener">
+      <span class="li2">${l.icon}</span>
+      <span><span class="ln">${escHtml(l.name)}</span><br><span class="ld">${escHtml(l.desc)}</span></span>
+    </a>`).join("");
+}
+function tickCompanion(){
+  if(!compTimers.length) return;
+  let changed = false;
+  for(const t of compTimers){
+    const left = Math.floor((t.ends - Date.now())/1000);
+    const el = document.querySelector(`[data-timer="${t.id}"]`);
+    if(el) el.textContent = left <= 0 ? "done" : fmtCountdown(left);
+    if(left <= 0 && !t.notified){
+      t.notified = true; changed = true;
+      logAct("⏰", `Timer finished: ${t.label}`);
+      toast(`⏰ ${escHtml(t.label)} — time's up!`, "ok");
+      notify("LumberCorp 2.0", `⏰ ${t.label} — time's up!`);
+    }
+  }
+  if(changed){
+    store.set("lc2_timers", compTimers);
+    if(state.page === "companion") renderCompanion();
+  }
+}
+function addCompTimer(label, mins){
+  label = (label != null ? label : $("timerLabel").value).trim() || "Timer";
+  const m = mins || Number($("timerMins").value) || 15;
+  compTimers.push({ id: Date.now() + Math.random(), label, ends: Date.now() + m * 60000, notified: false });
+  store.set("lc2_timers", compTimers);
+  $("timerLabel").value = "";
+  logAct("⏳", `Timer started: ${label} (${fmtDur(m * 60)})`);
+  toast(`⏳ ${escHtml(label)} — ${fmtDur(m * 60)} on the clock`, "ok");
+  renderCompanion();
+}
+function addCompTracker(){
+  const name = $("trackName").value.trim();
+  const id = $("trackId").value.trim().replace(/\D/g, "");
+  const note = $("trackNote").value.trim();
+  if(!name || !id){ toast("Name and player ID required", "warn"); return; }
+  compTracker.unshift({ id, name, note, added: Date.now() });
+  compTracker = compTracker.slice(0, 50);
+  store.set("lc2_tracker", compTracker);
+  $("trackName").value = $("trackId").value = $("trackNote").value = "";
+  logAct("🎯", `Tracking ${name} [${id}]`);
+  renderCompanion();
+}
+
 /* ============================== TICKER ============================== */
 /* Advance bars client-side each second (works for demo & between live polls). */
 function simTick(dt){
@@ -1987,7 +2155,7 @@ let palSel = 0, palItems = [];
 function palSources(){
   const out = [];
   for(const p of Object.keys(PAGES)) out.push({ icon: PAGES[p] ? "" : "", title: "Go to " + PAGES[p][0], sub: PAGES[p][1], key: "page", run: () => goto(p) });
-  const pIcons = { dashboard:"⚡", flight:"✈️", market:"💱", stats:"📈", alerts:"🔔", settings:"⚙️" };
+  const pIcons = { dashboard:"⚡", flight:"✈️", market:"💱", stats:"📈", alerts:"🔔", companion:"🧭", settings:"⚙️" };
   for(const o of out) o.icon = pIcons[o.title.replace("Go to ", "").toLowerCase()] || "➜";
   for(const d of DESTINATIONS) out.push({ icon: flagEmoji(d.flag), title: "Fly to " + d.country, sub: d.city + " · fastest " + fmtDur(Math.min(...Object.values(d.times)) * 60), key: "flight", run: () => { goto("flight"); $("planDest").value = d.country; renderPlanInfo(); } });
   for(const i of (state.itemCache || state.items).slice(0, 40)) out.push({ icon: i.icon || "📦", title: i.name, sub: i.type + " · " + fmtMoney(i.market_value), key: "market", run: () => { goto("market"); $("mktSearch").value = i.name; renderMarket(); } });
@@ -2189,6 +2357,19 @@ function wire(){
     keys.forEach(k => store.del(k));
     location.reload();
   });
+
+  // companion
+  $("compNotes").addEventListener("input", () => {
+    compNotes = $("compNotes").value;
+    clearTimeout(compNotesT);
+    compNotesT = setTimeout(() => store.set("lc2_notes", compNotes), 300);
+  });
+  $("btnTimerAdd").addEventListener("click", () => addCompTimer());
+  $("timerLabel").addEventListener("keydown", e => { if(e.key === "Enter") addCompTimer(); });
+  $("timerQuick").querySelectorAll("[data-quickmin]").forEach(b =>
+    b.addEventListener("click", () => addCompTimer("", Number(b.dataset.quickmin))));
+  $("btnTrackAdd").addEventListener("click", addCompTracker);
+  $("trackId").addEventListener("keydown", e => { if(e.key === "Enter") addCompTracker(); });
 }
 /* Blank skeleton used when entering live mode — guarantees no demo numbers
    linger anywhere (Stats especially). */
@@ -2274,7 +2455,7 @@ function init(){
   }
   else scheduleLive();
   fetchYata(false);
-  setInterval(() => { simTick(1); updateDynamic(); checkAlerts(); }, 1000);
+  setInterval(() => { simTick(1); updateDynamic(); checkAlerts(); tickCompanion(); }, 1000);
   // periodic stock feed re-poll (every 3 min)
   setInterval(() => fetchYata(false), 3 * 60 * 1000);
   if("serviceWorker" in navigator && location.protocol.startsWith("http")){
