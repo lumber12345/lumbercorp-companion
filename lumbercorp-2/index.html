@@ -794,7 +794,7 @@ function flagEmoji(cc){
 }
 
 /* ---------- settings ---------- */
-const APP_VERSION = "2.17.0";
+const APP_VERSION = "2.18.0";
 const DEFAULT_SETTINGS = {
   mode: "demo", apiKey: "", refresh: 60,
   theme: "dark", accent: "amber",
@@ -1917,7 +1917,7 @@ function bzSyncEmbed(){
   }catch(e){ /* storage unavailable — embed asks for its own key */ }
 }
 function bzSource(){
-  return (bzViewState.src === "local" || !!settings.bzProxy) ? "local" : "remote";
+  return settings.bzRemote === "1" ? "remote" : "local";
 }
 function bzSetFrame(url){
   if(bzViewState.frameSrc === url) return;
@@ -1932,6 +1932,14 @@ function bzPingRemote(){
       .then(() => { if(!done){ done = true; clearTimeout(t); resolve(true); } })
       .catch(() => { if(!done){ done = true; clearTimeout(t); resolve(false); } });
   });
+}
+function bzTryRemote(){
+  settings.bzRemote = "1";
+  saveSettings();
+  bzViewState.tries = 0;
+  if(bzViewState.timer){ clearTimeout(bzViewState.timer); bzViewState.timer = null; }
+  toast("🌐 Trying bazaar-i5o8.onrender.com…", "ok");
+  bzApplyView();
 }
 function bzCard(html){
   const c = $("bzScanProxy");
@@ -1949,27 +1957,16 @@ function bzCard(html){
   if(r) r.addEventListener("click", () => { bzViewState.tries = 0; bzApplyView(); });
   const b = $("btnBzLocal");
   if(b) b.addEventListener("click", () => {
+    settings.bzRemote = "";
+    saveSettings();
+    bzViewState.tries = 0;
     if(bzViewState.timer){ clearTimeout(bzViewState.timer); bzViewState.timer = null; }
-    bzViewState.src = "local";
     bzApplyView();
   });
   const d = $("btnBzRemote");
-  if(d) d.addEventListener("click", () => {
-    settings.bzProxy = "";
-    saveSettings();
-    bzViewState.src = null;
-    bzViewState.tries = 0;
-    if(bzViewState.timer){ clearTimeout(bzViewState.timer); bzViewState.timer = null; }
-    toast("📡 Trying bazaar-i5o8.onrender.com…", "ok");
-    bzApplyView();
-  });
+  if(d) d.addEventListener("click", () => { bzTryRemote(); });
   const t = $("btnBzTryRemote");
-  if(t) t.addEventListener("click", () => {
-    bzViewState.src = null;
-    bzViewState.tries = 0;
-    if(bzViewState.timer){ clearTimeout(bzViewState.timer); bzViewState.timer = null; }
-    bzApplyView();
-  });
+  if(t) t.addEventListener("click", () => { bzTryRemote(); });
 }
 function bzApplyView(){
   $("bzScanNote").hidden = state.mode === "live";
@@ -1984,12 +1981,15 @@ function bzApplyView(){
     if(!bzApiBase()){
       $("bzview-scan").hidden = true;
       bzCard(`<div class="setrow">
-        <div><div class="st">📡 Built-in scanner needs a backend</div>
-        <div class="sd">Paste the LumberCorp proxy URL — on Render it's wired automatically via <code>RW_PROXY_URL</code>. Saved for the Bazaar tab only; Rank Wars is untouched.</div></div>
+        <div><div class="st">🛒 Bazaar runs the built-in scanner (lumber12345/bazaar)</div>
+        <div class="sd">The repo's app is embedded here directly — it just needs the LumberCorp proxy as backend (on Render it's wired automatically via <code>RW_PROXY_URL</code>). Paste a proxy to scan now, or try your Render deployment instead. Bazaar-only setting; Rank Wars is untouched.</div></div>
       </div>
       <div class="setrow">
         <input type="text" id="bzProxyInput" placeholder="https://your-proxy.onrender.com" style="flex:1;min-width:220px;background:var(--card2);border:1px solid var(--border2);border-radius:10px;padding:9px 11px;font-weight:600">
         <button class="btn sm primary" id="btnBzProxy">Save &amp; scan</button>
+      </div>
+      <div class="setrow" style="gap:8px;flex-wrap:wrap">
+        <button class="btn sm" id="btnBzTryRemote">🌐 Try my deployment</button>
       </div>`);
       return;
     }
@@ -2020,9 +2020,10 @@ async function bzWake(){
   if(bzViewState.tries > 12 && bzApiBase()){
     /* a proxy is configured (pasted or deploy-time) — switch to the built-in
        scanner automatically so the tab keeps working without the deployment */
-    bzViewState.src = "local";
+    settings.bzRemote = "";
+    saveSettings();
     if(bzViewState.timer){ clearTimeout(bzViewState.timer); bzViewState.timer = null; }
-    toast("📡 Deployment unreachable — using built-in scanner via your proxy", "warn");
+    toast("📡 Deployment unreachable — using the built-in scanner via your proxy", "warn");
     bzApplyView();
     return;
   }
