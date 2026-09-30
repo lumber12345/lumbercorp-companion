@@ -115,7 +115,7 @@
   .bz-subtabs button:hover{color:var(--text);border-color:var(--border2)}
   .bz-subtabs button.active{background:var(--card3);color:var(--text);border-color:var(--accent);box-shadow:0 2px 12px var(--glow)}
   .bz-subtabs .live-dot{width:7px;height:7px;border-radius:50%;background:var(--ok);animation:pulse 2s infinite}
-  #bzFrame,#bzFindFrame{width:100%;height:clamp(560px,80vh,1100px);border:1px solid var(--border2);border-radius:14px;background:#0b0e14;display:block;margin-top:12px}
+  #bzFrame{width:100%;height:clamp(560px,80vh,1100px);border:1px solid var(--border2);border-radius:14px;background:#0b0e14;display:block;margin-top:12px}
 
   /* ================= rank wars ================= */
   /* ---- rank wars sub tabs (mirror of the rankwars app tabs) ---- */
@@ -572,7 +572,6 @@
     <section id="page-bazaar" hidden>
       <nav class="bz-subtabs" id="bzSubTabs">
         <button class="active" data-bzview="scan"><span class="live-dot"></span> Scanner</button>
-        <button data-bzview="find">⚡ Quick Find</button>
       </nav>
       <div class="card setcard" id="bzScanNote" hidden>
         <div class="setrow">
@@ -584,11 +583,6 @@
       <div id="bzview-scan" hidden>
         <iframe id="bzFrame" title="Torn Bazaar Scanner" src="about:blank" referrerpolicy="no-referrer"></iframe>
       </div>
-      <div id="bzview-find" hidden>
-      <div id="bzFindWrap" hidden>
-        <iframe id="bzFindFrame" title="Bazaar Finder — Torn Bazaar Scanner" src="about:blank" referrerpolicy="no-referrer"></iframe>
-      </div>
-      </div><!-- /bzview-find -->
     </section>
 
     <!-- ============ STATS ============ -->
@@ -814,7 +808,7 @@ function flagEmoji(cc){
 }
 
 /* ---------- settings ---------- */
-const APP_VERSION = "2.15.0";
+const APP_VERSION = "2.16.0";
 const DEFAULT_SETTINGS = {
   mode: "demo", apiKey: "", refresh: 60,
   theme: "dark", accent: "amber",
@@ -1926,7 +1920,7 @@ function rwEnter(){ rwState.tries = 0; rwFrameOn(); }
  * copy running against your proxy. Free Render instances sleep after
  * 15 min idle, so a wake card pings and retries automatically. */
 const BZ_REMOTE = "https://bazaar-i5o8.onrender.com";
-const bzViewState = { view: "scan", src: null, tries: 0, timer: null, frameSrc: { scan: null, find: null } };
+const bzViewState = { view: "scan", src: null, tries: 0, timer: null, frameSrc: { scan: null } };
 function bzApiBase(){
   return (settings.bzProxy || settings.rwProxy || (window.RW_PROXY_URL || "")).trim().replace(/\/$/, "");
 }
@@ -1941,7 +1935,7 @@ function bzSource(){
 }
 function bzSetFrame(which, url){
   if(bzViewState.frameSrc[which] === url) return;
-  $(which === "scan" ? "bzFrame" : "bzFindFrame").src = url;
+  $("bzFrame").src = url;
   bzViewState.frameSrc[which] = url;
 }
 function bzPingRemote(){
@@ -1994,8 +1988,6 @@ function bzCard(html){
 function bzApplyView(){
   const v = bzViewState.view;
   $("bzScanNote").hidden = state.mode === "live";
-  $("bzview-find").hidden = v !== "find";
-  $("bzFindWrap").hidden = true;
   if(state.mode !== "live"){
     $("bzScanProxy").hidden = true;
     $("bzview-scan").hidden = true;
@@ -2017,7 +2009,6 @@ function bzApplyView(){
       return;
     }
     $("bzview-scan").hidden = v !== "scan";
-    $("bzFindWrap").hidden = v !== "find";
     bzSyncEmbed();
     bzSetFrame(v, "bazaar/index.html");
     bzCard(`<div class="setrow"><div><div class="st">🔗 Built-in scanner → ${(bzApiBase() || "").replace(/^https?:\/\//, "").replace(/\/$/, "")}</div>
@@ -2037,12 +2028,10 @@ async function bzWake(){
     if(bzViewState.timer){ clearTimeout(bzViewState.timer); bzViewState.timer = null; }
     $("bzScanProxy").hidden = true;
     $("bzview-scan").hidden = v !== "scan";
-    $("bzFindWrap").hidden = v !== "find";
     bzSetFrame(v, BZ_REMOTE + "/");
     return;
   }
   $("bzview-scan").hidden = true;
-  $("bzFindWrap").hidden = true;
   bzViewState.tries++;
   if(bzViewState.tries > 12 && bzApiBase()){
     /* a proxy is configured (pasted or deploy-time) — switch to the built-in
@@ -2076,7 +2065,7 @@ async function bzWake(){
   }
 }
 function bzSetView(v){
-  if(!["scan", "find"].includes(v)) return;
+  if(v !== "scan") return;
   bzViewState.view = v;
   document.querySelectorAll("#bzSubTabs button").forEach(b =>
     b.classList.toggle("active", b.dataset.bzview === v));
