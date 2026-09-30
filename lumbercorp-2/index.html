@@ -844,7 +844,7 @@ function flagEmoji(cc){
 }
 
 /* ---------- settings ---------- */
-const APP_VERSION = "2.26.0";
+const APP_VERSION = "2.27.0";
 const DEFAULT_SETTINGS = {
   mode: "demo", apiKey: "", refresh: 60,
   theme: "dark", accent: "amber",
@@ -2396,11 +2396,11 @@ async function gsWake(){
   }
   $("gsWrap").hidden = true;
   gameState.tries++;
-  const waking = gameState.tries <= 12;
+  const waking = gameState.tries <= 36;
   if(waking){
     gameCard(`<div class="setrow"><div><div class="st">⏳ Waking blackstone-online.onrender.com…</div>
-    <div class="sd">Free Render instances sleep after 15 minutes idle — the first load can take up to a minute. Retrying automatically…</div></div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" id="btnGsRetry">⟳ Retry now</button></div></div>`);
+    <div class="sd">Free Render instances sleep after 15 minutes idle — the first load can take up to a minute, occasionally a few. Retrying automatically… <b>${gameState.tries * 5}s</b></div></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" id="btnGsRetry">⟳ Retry now</button><a class="btn sm primary" href="${GAME_REMOTE}" target="_blank" rel="noopener">↗ Open it now (wakes it too)</a></div></div>`);
   } else {
     gameCard(`<div class="setrow"><div><div class="st">🔴 blackstone-online.onrender.com is unreachable</div>
     <div class="sd">Free instances sleep when idle — if it stays down, your Render <b>free instance hours</b> may have run out this month (check the Render dashboard) or the service was suspended.</div></div></div>
