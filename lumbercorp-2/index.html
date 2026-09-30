@@ -794,7 +794,7 @@ function flagEmoji(cc){
 }
 
 /* ---------- settings ---------- */
-const APP_VERSION = "2.20.0";
+const APP_VERSION = "2.21.0";
 const DEFAULT_SETTINGS = {
   mode: "demo", apiKey: "", refresh: 60,
   theme: "dark", accent: "amber",
@@ -1917,7 +1917,7 @@ function bzSyncEmbed(){
   }catch(e){ /* storage unavailable — embed asks for its own key */ }
 }
 function bzSource(){
-  return settings.bzRemote === "1" ? "remote" : "local";
+  return (bzViewState.src === "local" || !!settings.bzProxy) ? "local" : "remote";
 }
 function bzSetFrame(url){
   if(bzViewState.frameSrc === url) return;
@@ -1934,11 +1934,12 @@ function bzPingRemote(){
   });
 }
 function bzTryRemote(){
-  settings.bzRemote = "1";
+  settings.bzProxy = "";
   saveSettings();
+  bzViewState.src = null;
   bzViewState.tries = 0;
   if(bzViewState.timer){ clearTimeout(bzViewState.timer); bzViewState.timer = null; }
-  toast("🌐 Trying bazaar-i5o8.onrender.com…", "ok");
+  toast("🌐 Loading bazaar-i5o8.onrender.com…", "ok");
   bzApplyView();
 }
 function bzCard(html){
@@ -1957,8 +1958,7 @@ function bzCard(html){
   if(r) r.addEventListener("click", () => { bzViewState.tries = 0; bzApplyView(); });
   const b = $("btnBzLocal");
   if(b) b.addEventListener("click", () => {
-    settings.bzRemote = "";
-    saveSettings();
+    bzViewState.src = "local";
     bzViewState.tries = 0;
     if(bzViewState.timer){ clearTimeout(bzViewState.timer); bzViewState.timer = null; }
     bzApplyView();
@@ -2044,8 +2044,7 @@ async function bzWake(){
   if(bzViewState.tries > 12 && bzApiBase()){
     /* a proxy is configured (pasted or deploy-time) — switch to the built-in
        scanner automatically so the tab keeps working without the deployment */
-    settings.bzRemote = "";
-    saveSettings();
+    bzViewState.src = "local";
     if(bzViewState.timer){ clearTimeout(bzViewState.timer); bzViewState.timer = null; }
     toast("📡 Deployment unreachable — using the built-in scanner via your proxy", "warn");
     bzApplyView();
