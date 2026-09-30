@@ -103,6 +103,17 @@
   .clockbox b{color:var(--muted);font-variant-numeric:tabular-nums;font-weight:600}
 
   /* ================= rank wars ================= */
+  .rw-subtabs{display:flex;gap:6px;margin:0 2px 12px;overflow-x:auto;scrollbar-width:none}
+  .rw-subtabs::-webkit-scrollbar{display:none}
+  .rw-subtabs button{
+    display:inline-flex;align-items:center;gap:6px;flex:0 0 auto;
+    background:var(--card);border:1px solid var(--border);color:var(--muted);
+    font-size:12.5px;font-weight:700;padding:8px 14px;border-radius:99px;cursor:pointer;transition:.15s;
+    white-space:nowrap;
+  }
+  .rw-subtabs button:hover{color:var(--text);border-color:var(--border2)}
+  .rw-subtabs button.active{background:var(--card3);color:var(--text);border-color:var(--accent);box-shadow:0 2px 12px var(--glow)}
+  .rw-subtabs .live-dot{width:7px;height:7px;border-radius:50%;background:var(--ok);animation:pulse 2s infinite}
   .rw-war{padding:14px 15px;cursor:pointer;transition:.15s;position:relative}
   .rw-war:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 8px 20px var(--glow)}
   .rw-war .rwtop{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -527,6 +538,10 @@
 
     <!-- ============ RANK WARS ============ -->
     <section id="page-rankwars" hidden>
+      <nav class="rw-subtabs" id="rwSubTabs">
+        <button class="active" data-rwview="live"><span class="live-dot"></span> Live Wars</button>
+      </nav>
+      <div id="rwview-live">
       <div class="card setcard" id="rwSetup" hidden>
         <div class="setrow">
           <div><div class="st">⚡ Connect live data</div>
@@ -544,8 +559,9 @@
         <button class="btn sm" id="btnRwRefresh">⟳ Refresh</button>
       </div>
       <div id="rwDetail"></div>
-      <h2 class="sec">Wars</h2>
+      <h2 class="sec">Live Wars</h2>
       <div class="grid g2" id="rwWarsList"></div>
+      </div><!-- /rwview-live -->
     </section>
 
     <!-- ============ STATS ============ -->
@@ -777,7 +793,7 @@ function flagEmoji(cc){
 }
 
 /* ---------- settings ---------- */
-const APP_VERSION = "2.3.2";
+const APP_VERSION = "2.3.3";
 const DEFAULT_SETTINGS = {
   mode: "demo", apiKey: "", refresh: 60,
   theme: "dark", accent: "amber",
@@ -1875,6 +1891,12 @@ async function rwCall(pathname, params){
 }
 /* ----- rendering ----- */
 function rwStatusChip(txt, cls){ const el = $("rwStatus"); el.className = "chip " + (cls || ""); el.textContent = txt; }
+function showRwView(v){
+  document.querySelectorAll("#rwSubTabs button").forEach(b =>
+    b.classList.toggle("active", b.dataset.rwview === v));
+  $("rwview-live").hidden = v !== "live";
+  if(v === "live") rwLoad();
+}
 function rwEnter(){
   $("rwSetup").hidden = !!settings.rwProxy || state.mode !== "live";
   if(!rwIsLive()){
@@ -2379,6 +2401,8 @@ function wire(){
 
 
   // rank wars
+  document.querySelectorAll("#rwSubTabs button").forEach(b =>
+    b.addEventListener("click", () => showRwView(b.dataset.rwview)));
   $("btnRwRefresh").addEventListener("click", () => rwLoad());
   $("btnRwProxy").addEventListener("click", () => {
     settings.rwProxy = ($("rwProxyInput").value || "").trim().replace(/\/$/, "");
