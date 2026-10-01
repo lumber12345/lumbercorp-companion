@@ -232,12 +232,13 @@
     background:radial-gradient(circle, var(--glow), transparent 70%);pointer-events:none;
   }
   .avatar{
+    position:relative;
     width:64px;height:64px;border-radius:16px;flex:0 0 auto;overflow:hidden;
     background:linear-gradient(135deg,var(--card3),var(--card2));
     border:1px solid var(--border2);display:grid;place-items:center;
     font-size:26px;font-weight:900;color:var(--accent);
   }
-  .avatar img{width:100%;height:100%;object-fit:cover;display:block}
+  .avatar img{position:absolute;inset:0;width:100%;height:100%;max-width:none;object-fit:cover;display:none;border:none}
   .idmain{min-width:180px;flex:1}
   .idname{font-size:18px;font-weight:800;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .idsub{font-size:12.5px;color:var(--muted);margin-top:2px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
@@ -503,7 +504,7 @@
         </div>
       </div>
       <div class="card idcard">
-        <div class="avatar" id="idAvatar" title="Torn profile picture"><span id="idAvatarLetter">S</span><img id="idAvatarImg" alt="" hidden></div>
+        <div class="avatar" id="idAvatar" title="Torn profile picture"><span id="idAvatarLetter">S</span><img id="idAvatarImg" alt=""></div>
         <div class="idmain">
           <div class="idname"><span id="idName">—</span><span class="chip accent" id="idTag">—</span></div>
           <div class="idsub"><span id="idLevel">—</span> · <span id="idRank">—</span></div>
@@ -871,7 +872,7 @@ function flagEmoji(cc){
 }
 
 /* ---------- settings ---------- */
-const APP_VERSION = "2.42.0";
+const APP_VERSION = "2.43.0";
 const DEFAULT_SETTINGS = {
   mode: "demo", apiKey: "", refresh: 60,
   theme: "dark", accent: "amber",
@@ -1527,13 +1528,18 @@ function renderDashboard(){
   const aImg = document.getElementById("idAvatarImg");
   if(aLetter) aLetter.textContent = (u.name || "?").charAt(0).toUpperCase();
   const pUrl = u.profile_image && typeof u.profile_image === "string" ? u.profile_image : "";
-  if(aImg && aImg.src !== pUrl){
-    if(!pUrl){ aImg.hidden = true; aImg.removeAttribute("src"); }
-    else {
-      aImg.onload = () => { aImg.hidden = false; };
-      aImg.onerror = () => { aImg.hidden = true; };
+  if(aImg){
+    const show = () => { aImg.style.display = "block"; };
+    if(!pUrl){
+      aImg.removeAttribute("src"); aImg.style.display = "none";
+    } else if(aImg.getAttribute("src") !== pUrl){
+      aImg.style.display = "none";
+      aImg.onload = show;
+      aImg.onerror = () => { aImg.style.display = "none"; };
       aImg.src = pUrl;
     }
+    /* image already cached/complete — show immediately */
+    if(aImg.complete && aImg.naturalWidth > 0) show();
   }
   $("idName").textContent = u.name || "—";
   const ftag = state.faction && state.faction.tag;
