@@ -870,7 +870,7 @@ function flagEmoji(cc){
 }
 
 /* ---------- settings ---------- */
-const APP_VERSION = "2.38.0";
+const APP_VERSION = "2.39.0";
 const DEFAULT_SETTINGS = {
   mode: "demo", apiKey: "", refresh: 60,
   theme: "dark", accent: "amber",
@@ -1129,8 +1129,16 @@ async function tornFetch(path){
   let res;
   try{ res = await fetch(path, { cache: "no-store" }); }
   catch(e){ const err = new Error("Network error — can't reach Torn"); throw err; }
+  let txt = "";
+  try{ txt = await res.text(); }catch(e){ txt = ""; }
+  /* flight recorder: keep the raw reply per selection for the debug strip */
+  try{
+    const sel = (path.split("selections=")[1] || "core").split("&")[0];
+    state.lastRaw = state.lastRaw || {};
+    state.lastRaw[sel] = { status: res.status, body: String(txt).slice(0, 600) };
+  }catch(e2){ /* recorder must never break the app */ }
   let j = null;
-  try{ j = await res.json(); }catch(e){ throw new Error("Bad JSON from Torn (HTTP " + res.status + ")"); }
+  try{ j = JSON.parse(txt); }catch(e){ throw new Error("Bad JSON from Torn (HTTP " + res.status + ")"); }
   if(j && j.error){ const err = new Error(j.error.error); err.code = j.error.code; throw err; }
   return j;
 }
@@ -1593,9 +1601,40 @@ function renderBars(){
         probeOut.innerHTML = '<span style="color:var(--bad)">Probe failed:</span> ' + escHtml(err.message || err);
       }
     };
-    runProbe();
+    /* auto-probe ONCE per key+failure episode — re-probing on every render
+       spams Torn and can trip rate limits that make good keys look broken */
+    const sig = (settings.apiKey || "").slice(-4) + ":" + (state.liveErrKey || "ok");
+    if(state.barsProbeSig !== sig){ state.barsProbeSig = sig; runProbe(); }
     const tb = document.getElementById("btnBarsProbe");
     if(tb) tb.addEventListener("click", runProbe);
+    /* flight-recorder strip: version · mode · key · flags · copyable debug */
+    const strip = document.createElement("div");
+    const km = (settings.apiKey || "").trim();
+    strip.style.cssText = "margin-top:8px;font-size:11px;color:var(--faint);font-family:ui-monospace,SFMono-Regular,monospace;line-height:1.7";
+    strip.innerHTML =
+      "v" + APP_VERSION + " · mode=" + escHtml(state.mode) +
+      " · key=" + (km ? escHtml(km.slice(0,4) + "…" + km.slice(-4)) : "none") +
+      " · synced=" + (state.liveSynced ? "yes" : "no") +
+      " · caps=" + escHtml(JSON.stringify(state.caps || null)) +
+      " · lastErr=" + escHtml(state.liveErrKey || "none") +
+      ` <button class="btn sm" id="btnBarsDebug" style="margin-left:6px">📋 Copy debug</button>`;
+    probeOut.parentNode.insertBefore(strip, probeOut.nextSibling);
+    const db = strip.querySelector("#btnBarsDebug");
+    if(db) db.addEventListener("click", () => {
+      const dump = JSON.stringify({
+        version: APP_VERSION, ua: (navigator.userAgent || "").slice(0, 80),
+        mode: state.mode, key: km ? km.slice(0,4) + "…" + km.slice(-4) + " (" + km.length + " chars)" : null,
+        liveSynced: state.liveSynced, liveErrKey: state.liveErrKey || null,
+        caps: state.caps || null, bars: state.user && state.user.bars ? state.user.bars : null,
+        lastRaw: state.lastRaw || null, refresh: settings.refresh
+      }, null, 1);
+      const done = () => { db.textContent = "✓ Copied"; setTimeout(() => db.textContent = "📋 Copy debug", 1500); };
+      if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(dump).then(done).catch(() => {});
+      else {
+        const ta = document.createElement("textarea"); ta.value = dump; document.body.appendChild(ta);
+        ta.select(); try{ document.execCommand("copy"); done(); }catch(e2){} ta.remove();
+      }
+    });
   }
   const fixBtn = document.getElementById("btnBarsFix");
   if(fixBtn){
