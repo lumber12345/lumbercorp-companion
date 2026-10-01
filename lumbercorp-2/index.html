@@ -870,7 +870,7 @@ function flagEmoji(cc){
 }
 
 /* ---------- settings ---------- */
-const APP_VERSION = "2.37.0";
+const APP_VERSION = "2.38.0";
 const DEFAULT_SETTINGS = {
   mode: "demo", apiKey: "", refresh: 60,
   theme: "dark", accent: "amber",
@@ -1185,6 +1185,7 @@ const LIVE_PARTS = [
 ];
 async function loadLive(){
   if(state.mode !== "live") return;
+  try{
   const parts = await Promise.all(LIVE_PARTS.map(async ([name, sel]) => {
     const fn = name === "bars" ? tornBars : tornUser;
     try{ return { name, data: await fn(sel), err: null }; }
@@ -1193,8 +1194,11 @@ async function loadLive(){
   const byName = {};
   for(const r of parts) byName[r.name] = r;
   if(byName.core.err){
-    /* core is public — only a network failure or a dead key kills it */
+    /* core is public — only a network failure or a dead key kills it.
+       Mark the sync as done so the bars section shows its fix-it card
+       instead of "waiting for data…" forever. */
     const err = byName.core.err;
+    state.liveSynced = true;
     toast("⚠️ " + escHtml(describeApiError(err)), "bad");
     logAct("⚠️", "Live sync failed: " + describeApiError(err));
     if(err.code === 2) setMode("demo");
@@ -1242,6 +1246,7 @@ async function loadLive(){
       logAct("⚠️", "Live sync partial: " + escHtml(fails.join(" · ")));
     }
   } else { state.liveErrKey = null; }
+  state.liveSynced = true;   // sync finished — bars must never sit in limbo after this
   fetchItemDB();
   try{
     const ps = await tornUser("personalstats");
@@ -1317,6 +1322,11 @@ async function loadLive(){
   }
   renderAll();
   scheduleLive();
+  }catch(e){
+    state.liveSynced = true;
+    toast("⚠️ Live sync error: " + escHtml(e.message || e), "bad");
+    renderAll();
+  }
 }
 function scheduleLive(){
   if(liveTimer) clearTimeout(liveTimer);
@@ -1527,11 +1537,14 @@ const BAR_META = [
   ["energy", "⚡ Energy"], ["nerve", "🎯 Nerve"], ["happy", "😀 Happy"], ["life", "❤️ Life"]
 ];
 function renderBars(){
-  const barsBlocked = state.mode === "live" && state.caps && state.caps.bars === false;
+  /* After a completed live sync, bars must either show data or explain
+     themselves. "Waiting for data…" is only honest while the sync runs. */
+  const barsLoaded = !!(state.user.bars && state.user.bars.energy && state.user.bars.energy.maximum > 0);
+  const barsBlocked = state.mode === "live" && state.liveSynced && !barsLoaded;
   $("barsWrap").innerHTML = BAR_META.map(([k, lbl]) => {
     const b = state.user.bars && state.user.bars[k];
     if(!b) return `<div class="card barcard">
-      <div class="top"><span class="lbl">${lbl}</span><span class="eta">waiting for data…</span></div>
+      <div class="top"><span class="lbl">${lbl}</span><span class="eta">${state.mode === "live" && !state.liveSynced ? "syncing…" : "waiting for data…"}</span></div>
       <div class="v"><span class="bar-cur" data-bar="${k}">—</span></div>
       <div class="track"><div class="fill ${k}" data-fill="${k}" style="width:0%"></div></div>
     </div>`;
