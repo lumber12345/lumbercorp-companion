@@ -870,7 +870,7 @@ function flagEmoji(cc){
 }
 
 /* ---------- settings ---------- */
-const APP_VERSION = "2.35.0";
+const APP_VERSION = "2.36.0";
 const DEFAULT_SETTINGS = {
   mode: "demo", apiKey: "", refresh: 60,
   theme: "dark", accent: "amber",
@@ -1545,8 +1545,33 @@ function renderBars(){
       <div class="track"><div class="fill ${k}" data-fill="${k}" style="width:${pct}%"></div></div>
     </div>`;
   }).join("") + (barsBlocked
-    ? `<div class="updated" style="color:var(--warn)">🔒 Torn won't serve bars to this key's access level — Torn enforces this server-side, so no app setting can bypass it. 2-minute fix: <a href="https://www.torn.com/preferences.php#tab=api" target="_blank" rel="noopener" style="color:var(--info);text-decoration:underline">open Torn → Settings → API keys</a>, create a key with access level <b>Minimal</b> (unlocks bars, cooldowns, travel) or <b>Limited</b> (also unlocks cash, networth & stats), then paste it on Home or in Settings. Check it with "🔑 What can my key read?" below.</div>`
+    ? `<div class="card setcard" style="margin-top:2px">
+      <div class="st" style="color:var(--warn)">🔒 Bars are locked by your key's access level</div>
+      <div class="sd" style="margin:6px 0 10px;line-height:1.7">Torn refuses the <b>bars</b> selection to Public-level keys — this gate is on Torn's side; no app setting can bypass it. <b>2-minute fix:</b> create a key with level <b>Minimal</b> (bars, cooldowns, travel) or <b>Limited</b> (also cash, networth &amp; stats), then paste it right here.</div>
+      <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center">
+        <a class="btn sm" href="https://www.torn.com/preferences.php#tab=api" target="_blank" rel="noopener">🔑 Open Torn API settings</a>
+        <span class="sd">…then paste the new key below — bars appear instantly.</span>
+      </div>
+      <div class="keyrow" style="margin-top:9px">
+        <input type="password" id="barsFixKey" placeholder="Paste your new Minimal/Limited key…" autocomplete="off">
+        <button class="btn sm" id="btnBarsFix">Apply &amp; retry</button>
+      </div>
+    </div>`
     : "");
+  const fixBtn = document.getElementById("btnBarsFix");
+  if(fixBtn){
+    const applyFix = () => {
+      const v = ($("#barsFixKey").value || "").trim();
+      if(!v){ toast("Paste the new key first", "warn"); return; }
+      settings.apiKey = v; saveSettings();
+      const sk = $("setKey"); if(sk) sk.value = v;
+      toast("Key saved — retrying bars…", "ok");
+      if(state.mode !== "live"){ setMode("live"); } else { loadLive(); }
+    };
+    fixBtn.addEventListener("click", applyFix);
+    const fixInput = document.getElementById("barsFixKey");
+    fixInput.addEventListener("keydown", e => { if(e.key === "Enter"){ e.preventDefault(); applyFix(); } });
+  }
 }
 function renderActions(){
   const list = actionsList();
@@ -2827,12 +2852,13 @@ function wire(){
   $("setKey").addEventListener("change", e => {
     settings.apiKey = e.target.value.trim(); saveSettings();
     toast("API key saved", "ok");
+    if(state.mode === "live") loadLive();          // retry everything immediately
   });
   $("btnHomeSaveKey").addEventListener("click", () => {
     settings.apiKey = ($("homeKey").value || "").trim(); saveSettings();
     if(!settings.apiKey){ toast("Paste a key first", "warn"); return; }
     toast("API key saved", "ok");
-    if(state.mode === "live") scheduleLive();
+    if(state.mode === "live") loadLive();          // retry everything immediately
     else setMode("live");
   });
   $("homeKey").addEventListener("keydown", e => { if(e.key === "Enter"){ e.preventDefault(); $("btnHomeSaveKey").click(); } });
