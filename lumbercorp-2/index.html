@@ -870,7 +870,7 @@ function flagEmoji(cc){
 }
 
 /* ---------- settings ---------- */
-const APP_VERSION = "2.40.0";
+const APP_VERSION = "2.41.0";
 const DEFAULT_SETTINGS = {
   mode: "demo", apiKey: "", refresh: 60,
   theme: "dark", accent: "amber",
@@ -1161,15 +1161,18 @@ async function tornFaction(selections){
    /user/bars can succeed where the v1 path is refused. Bad key (code 2)
    still aborts immediately. */
 async function tornBars(){
+  /* Torn now returns bars UNWRAPPED ({server_time, energy, nerve, …}) — the
+     recorded raw reply proves it. Accept wrapped ({bars:{…}}) and unwrapped. */
+  const normalize = (j) => (j && !j.bars && (j.energy || j.server_time)) ? { bars: j } : j;
   let firstErr = null;
-  try{ return await tornUser("bars"); }
+  try{ return normalize(await tornUser("bars")); }
   catch(e){ firstErr = e; if(e.code === 2) throw e; }
   const base = (typeof bzApiBase === "function" ? (bzApiBase() || "") : "").trim();
   if(base && (settings.apiKey || "").trim()){
     try{
       const r = await fetch(base + "/api/torn?path=" + encodeURIComponent("/user/bars")
         + "&key=" + encodeURIComponent(settings.apiKey.trim()), { cache: "no-store" });
-      const j = await r.json();
+      const j = normalize(await r.json());
       if(j && j.bars) return j;
     }catch(e2){ /* fall through with the original error */ }
   }
@@ -1226,10 +1229,12 @@ async function loadLive(){
     nw = (typeof nwResp.networth === "object" && nwResp.networth.total != null) ? nwResp.networth.total : nwResp.networth;
   }
   if(nw != null) u.networth = nw;
-  /* bars part → merge per bar so a partial response never blanks a bar */
+  /* bars part → merge per bar so a partial response never blanks a bar.
+     Wrapped ({bars:{…}}) and unwrapped ({energy, …}) responses both accepted. */
   const barsResp = byName.bars.data;
-  if(barsResp && barsResp.bars){
-    u.bars = Object.assign({}, emptyUser().bars, state.user.bars, barsResp.bars);
+  const barsRaw = barsResp ? (barsResp.bars || ((barsResp.energy || barsResp.server_time) ? barsResp : null)) : null;
+  if(barsRaw){
+    u.bars = Object.assign({}, emptyUser().bars, state.user.bars, barsRaw);
   }
   if(byName.cds.data && byName.cds.data.cooldowns) u.cooldowns = byName.cds.data.cooldowns;
   if(byName.travel.data && byName.travel.data.travel) u.travel = byName.travel.data.travel;
@@ -1238,7 +1243,7 @@ async function loadLive(){
   state.lastUpdated = Date.now();
   state.caps = {
     basic: true,
-    bars: !!(barsResp && barsResp.bars),
+    bars: !!barsRaw,
     money: !!(moneyResp && moneyResp.money_onhand != null),
     networth: nw != null,
     stats: false, faction: false
