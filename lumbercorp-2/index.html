@@ -870,7 +870,7 @@ function flagEmoji(cc){
 }
 
 /* ---------- settings ---------- */
-const APP_VERSION = "2.34.0";
+const APP_VERSION = "2.35.0";
 const DEFAULT_SETTINGS = {
   mode: "demo", apiKey: "", refresh: 60,
   theme: "dark", accent: "amber",
@@ -1545,7 +1545,7 @@ function renderBars(){
       <div class="track"><div class="fill ${k}" data-fill="${k}" style="width:${pct}%"></div></div>
     </div>`;
   }).join("") + (barsBlocked
-    ? `<div class="updated" style="color:var(--warn)">🔒 Torn won't serve bars to this key's access level (bars need <b>minimal</b>). Fix: Torn → Preferences → API keys → create a <b>minimal</b> (or higher) key and paste it in Settings — or set a proxy server below so the app can retry through v2.</div>`
+    ? `<div class="updated" style="color:var(--warn)">🔒 Torn won't serve bars to this key's access level — Torn enforces this server-side, so no app setting can bypass it. 2-minute fix: <a href="https://www.torn.com/preferences.php#tab=api" target="_blank" rel="noopener" style="color:var(--info);text-decoration:underline">open Torn → Settings → API keys</a>, create a key with access level <b>Minimal</b> (unlocks bars, cooldowns, travel) or <b>Limited</b> (also unlocks cash, networth & stats), then paste it on Home or in Settings. Check it with "🔑 What can my key read?" below.</div>`
     : "");
 }
 function renderActions(){
