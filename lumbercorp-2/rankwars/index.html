@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Torn Rank Wars — live ranked war tracker</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230b0d10'/%3E%3Cpath d='M7 7l10 10m0 0l4 4m-4-4l6-6m-6 6L9 25m8-8l6 6m-6-6L11 11' stroke='%23e8453c' stroke-width='2.6' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<canvas id="matrixcv" aria-hidden="true"></canvas>
+<header class="topbar">
+  <div class="brand" data-action="set-tab" data-tab="wars" title="Home">
+    <span class="brand-badge">TORN</span>
+    <span class="brand-name">RANK&nbsp;WARS</span>
+    <span id="demo-badge" class="demo-badge" hidden>DEMO</span>
+  </div>
+  <div class="top-controls">
+    <div class="keybox" title="Torn API key (Public level is enough). Stored only in your browser.">
+      <svg class="ic" viewBox="0 0 24 24"><path fill="currentColor" d="M12.65 10A6 6 0 1 0 12.65 14H17v3h3v-3h2v-4H12.65zM7 14a2 2 0 1 1 0-4 2 2 0 0 1 0 4z"/></svg>
+      <input id="key-input" type="password" placeholder="Torn API key (public)" autocomplete="off" spellcheck="false">
+      <button class="btn small" data-action="save-key">Save</button>
+      <span id="key-dot" class="dot" title="No key set"></span>
+    </div>
+    <label class="demo-toggle" title="Explore the app with simulated data">
+      <input type="checkbox" id="demo-toggle">
+      <span>Demo</span>
+    </label>
+    <div class="pollbox" title="Auto-refresh interval">
+      <select id="interval-select">
+        <option value="10">10s</option>
+        <option value="15" selected>15s</option>
+        <option value="30">30s</option>
+        <option value="60">60s</option>
+      </select>
+      <span id="next-refresh" class="next-refresh" title="Time until next auto refresh">—</span>
+      <button class="btn small icon" data-action="refresh-now" title="Refresh now">⟳</button>
+    </div>
+  </div>
+</header>
+
+<div id="errbar" class="errbar" hidden></div>
+
+<nav class="tabs" id="tabs">
+  <button class="tab" data-action="set-tab" data-tab="wars">LIVE WARS</button>
+  <button class="tab" data-action="set-tab" data-tab="room">WAR ROOM</button>
+  <button class="tab" data-action="set-tab" data-tab="hits">THE HIT CLUB</button>
+  <button class="tab" data-action="set-tab" data-tab="wrep">WAR REPORT</button>
+  <button class="tab" data-action="set-tab" data-tab="history">HISTORY &amp; REPORTS</button>
+  <button class="tab" data-action="set-tab" data-tab="about">SETUP &amp; ABOUT</button>
+</nav>
+
+<main id="view" class="view" aria-live="polite"></main>
+
+<footer class="foot">
+  Unofficial fan tool for <a href="https://www.torn.com" target="_blank" rel="noopener">Torn</a> · data via the official Torn API v2 · your key is stored locally and only proxied to api.torn.com.
+</footer>
+
+<script src="../config.js"></script>
+<script src="./app.js"></script>
+</body>
+</html>
