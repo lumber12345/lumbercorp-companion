@@ -870,7 +870,7 @@ function flagEmoji(cc){
 }
 
 /* ---------- settings ---------- */
-const APP_VERSION = "2.32.0";
+const APP_VERSION = "2.33.0";
 const DEFAULT_SETTINGS = {
   mode: "demo", apiKey: "", refresh: 60,
   theme: "dark", accent: "amber",
@@ -1147,35 +1147,79 @@ async function tornFaction(selections){
   return tornFetch(`${API}/faction/?selections=${selections}&key=${encodeURIComponent(key)}&comment=lumbercorp2`);
 }
 
-/* Poll live data. Basic bars/cooldowns/profile/money work with any key;
-   personalstats & faction need higher access and fail soft. */
+/* Poll live data — one independent call per selection group.
+   Torn access levels differ per selection (basic/profile: public · bars:
+   minimal · money/networth/personalstats: limited), and Torn calls are
+   all-or-nothing, so a low-level key used to lose EVERYTHING when one
+   selection was refused. Now each part loads or fails on its own and the
+   app keeps whatever the key CAN see. */
 let liveTimer = null;
-/* Selections have different key-access requirements (money/networth need
-   Personal, personalstats needs Limited). Torn calls are all-or-nothing, so
-   try the fullest set first and fall back so a weaker key still populates
-   everything it CAN. */
-const LIVE_TIERS = [
-  "bars,cooldowns,profile,money,networth,travel",
-  "bars,cooldowns,profile,travel",
-  "bars,cooldowns,profile"
+const LIVE_PARTS = [
+  ["core",     "basic,profile"],
+  ["bars",     "bars"],
+  ["cds",      "cooldowns"],
+  ["travel",   "travel"],
+  ["money",    "money"],
+  ["networth", "networth"]
 ];
 async function loadLive(){
   if(state.mode !== "live") return;
-  let u = null, lastErr = null;
-  for(const sel of LIVE_TIERS){
-    try{ u = await tornUser(sel); break; }
-    catch(e){ lastErr = e; if(e.code === 2) break; }   // bad key — stop retrying
-  }
-  if(!u){
-    const err = lastErr || new Error("Live sync failed");
+  const parts = await Promise.all(LIVE_PARTS.map(async ([name, sel]) => {
+    try{ return { name, data: await tornUser(sel), err: null }; }
+    catch(e){ return { name, data: null, err: e }; }
+  }));
+  const byName = {};
+  for(const r of parts) byName[r.name] = r;
+  if(byName.core.err){
+    /* core is public — only a network failure or a dead key kills it */
+    const err = byName.core.err;
     toast("⚠️ " + escHtml(describeApiError(err)), "bad");
     logAct("⚠️", "Live sync failed: " + describeApiError(err));
-    if(lastErr && lastErr.code === 2) setMode("demo");
+    if(err.code === 2) setMode("demo");
     return;
   }
+  const u = Object.assign({}, byName.core.data);
+  /* money part → cash + points */
+  const moneyResp = byName.money.data;
+  if(moneyResp){
+    u.money_onhand = moneyResp.money_onhand ?? null;
+    if(moneyResp.points != null) u.points = moneyResp.points;
+  }
+  /* networth part → Torn returns an OBJECT ({total, bank, …}); keep the total */
+  const nwResp = byName.networth.data;
+  let nw = null;
+  if(nwResp && nwResp.networth != null){
+    nw = (typeof nwResp.networth === "object" && nwResp.networth.total != null) ? nwResp.networth.total : nwResp.networth;
+  }
+  if(nw != null) u.networth = nw;
+  /* bars part → merge per bar so a partial response never blanks a bar */
+  const barsResp = byName.bars.data;
+  if(barsResp && barsResp.bars){
+    u.bars = Object.assign({}, emptyUser().bars, state.user.bars, barsResp.bars);
+  }
+  if(byName.cds.data && byName.cds.data.cooldowns) u.cooldowns = byName.cds.data.cooldowns;
+  if(byName.travel.data && byName.travel.data.travel) u.travel = byName.travel.data.travel;
+
   state.user = Object.assign(emptyUser(), state.user, u);
   state.lastUpdated = Date.now();
-  state.caps = { basic: true, money: u.money_onhand != null, stats: false, faction: false };
+  state.caps = {
+    basic: true,
+    bars: !!(barsResp && barsResp.bars),
+    money: !!(moneyResp && moneyResp.money_onhand != null),
+    networth: nw != null,
+    stats: false, faction: false
+  };
+  /* surface refused selections once per distinct failure set */
+  const fails = parts.filter(r => r.name !== "core" && r.err)
+                     .map(r => r.name + " — " + describeApiError(r.err));
+  if(fails.length){
+    const key = fails.join("|");
+    if(state.liveErrKey !== key){
+      state.liveErrKey = key;
+      toast("⚠️ Some live data unavailable: " + escHtml(fails[0]), "warn");
+      logAct("⚠️", "Live sync partial: " + escHtml(fails.join(" · ")));
+    }
+  } else { state.liveErrKey = null; }
   fetchItemDB();
   try{
     const ps = await tornUser("personalstats");
@@ -1446,7 +1490,7 @@ function renderDashboard(){
     st.color === "green" ? "var(--ok)" : st.color === "red" ? "var(--bad)" :
     st.color === "orange" ? "var(--warn)" : "var(--info)";
   $("idMoney").textContent = fmtMoney(u.money_onhand);
-  $("idNet").textContent = fmtMoney(u.networth);
+  $("idNet").textContent = fmtMoney(u.networth && typeof u.networth === "object" ? u.networth.total : u.networth);
   $("idPoints").textContent = fmtInt(u.points);
   renderBars(); renderActions(); renderCooldowns(); renderFlightMini(); renderActPreview();
 }
@@ -1461,9 +1505,14 @@ const BAR_META = [
   ["energy", "⚡ Energy"], ["nerve", "🎯 Nerve"], ["happy", "😀 Happy"], ["life", "❤️ Life"]
 ];
 function renderBars(){
+  const barsBlocked = state.mode === "live" && state.caps && state.caps.bars === false;
   $("barsWrap").innerHTML = BAR_META.map(([k, lbl]) => {
     const b = state.user.bars && state.user.bars[k];
-    if(!b) return "";
+    if(!b) return `<div class="card barcard">
+      <div class="top"><span class="lbl">${lbl}</span><span class="eta">waiting for data…</span></div>
+      <div class="v"><span class="bar-cur" data-bar="${k}">—</span></div>
+      <div class="track"><div class="fill ${k}" data-fill="${k}" style="width:0%"></div></div>
+    </div>`;
     const pct = b.maximum ? Math.max(0, Math.min(100, (b.current / b.maximum) * 100)) : 0;
     const eta = barETA(b);
     const etaTxt = !b.maximum ? "waiting for data…" : eta == null ? "no regen" : (pct >= 100 ? "full" : "full in " + fmtDur(eta));
@@ -1473,7 +1522,9 @@ function renderBars(){
         <small>/ ${fmtInt(b.maximum)} <span class="bar-tick" data-tick="${k}"></span></small></div>
       <div class="track"><div class="fill ${k}" data-fill="${k}" style="width:${pct}%"></div></div>
     </div>`;
-  }).join("");
+  }).join("") + (barsBlocked
+    ? `<div class="updated" style="color:var(--warn)">🔒 Torn won't serve bars to this key's access level — create a key with <b>minimal</b> access at Torn → Preferences → API keys and paste it in Settings.</div>`
+    : "");
 }
 function renderActions(){
   const list = actionsList();
