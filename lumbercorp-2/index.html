@@ -870,7 +870,7 @@ function flagEmoji(cc){
 }
 
 /* ---------- settings ---------- */
-const APP_VERSION = "2.36.0";
+const APP_VERSION = "2.37.0";
 const DEFAULT_SETTINGS = {
   mode: "demo", apiKey: "", refresh: 60,
   theme: "dark", accent: "amber",
@@ -1556,8 +1556,34 @@ function renderBars(){
         <input type="password" id="barsFixKey" placeholder="Paste your new Minimal/Limited key…" autocomplete="off">
         <button class="btn sm" id="btnBarsFix">Apply &amp; retry</button>
       </div>
+      <div style="margin-top:10px;font-size:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="btn sm" id="btnBarsProbe">🔁 Test bars now</button>
+        <span class="sd">Key in use: <b id="barsKeyMask" style="font-family:ui-monospace,monospace">…</b> — if that's not the key you just made, paste it above.</span>
+      </div>
+      <div id="barsProbeOut" style="margin-top:7px;font-size:12px;line-height:1.6"></div>
     </div>`
     : "");
+  const probeOut = document.getElementById("barsProbeOut");
+  if(probeOut){
+    const mk = (settings.apiKey || "").trim();
+    const maskEl = document.getElementById("barsKeyMask");
+    if(maskEl) maskEl.textContent = mk.length > 10 ? mk.slice(0, 4) + "…" + mk.slice(-4) + " (" + mk.length + " chars)" : mk ? "(" + mk.length + " chars)" : "none";
+    const runProbe = async () => {
+      probeOut.innerHTML = '<span style="color:var(--muted)">Asking Torn about the bars selection…</span>';
+      try{
+        const r = await diagSelection("bars");
+        probeOut.innerHTML = r.ok
+          ? '<span style="color:var(--ok)">✅ Torn serves bars to this key — reloading…</span>'
+          : '<span style="color:var(--bad)">⛔ Torn answers:</span> <span style="font-family:ui-monospace,SFMono-Regular,monospace">' + escHtml(r.msg) + '</span>' + (/incorrect/i.test(r.msg) ? '<div style="color:var(--warn);margin-top:3px">→ The key itself is wrong/expired. Copy it again from Torn (16 characters, no spaces) and paste it above.</div>' : "");
+        if(r.ok) setTimeout(() => loadLive(), 400);
+      }catch(err){
+        probeOut.innerHTML = '<span style="color:var(--bad)">Probe failed:</span> ' + escHtml(err.message || err);
+      }
+    };
+    runProbe();
+    const tb = document.getElementById("btnBarsProbe");
+    if(tb) tb.addEventListener("click", runProbe);
+  }
   const fixBtn = document.getElementById("btnBarsFix");
   if(fixBtn){
     const applyFix = () => {
