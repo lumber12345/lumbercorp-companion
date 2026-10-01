@@ -1,7 +1,7 @@
 /* LumberCorp 2.0 service worker — offline fallback + installability.
    Strategy: NETWORK-FIRST for same-origin GETs. The cache exists only so the
    app opens offline; when online you always get the newest build on reload. */
-const CACHE = "lumbercorp2-shell-v50";
+const CACHE = "lumbercorp2-shell-v51";
 const ASSETS = [
   "./",
   "./index.html",

@@ -870,7 +870,7 @@ function flagEmoji(cc){
 }
 
 /* ---------- settings ---------- */
-const APP_VERSION = "2.33.0";
+const APP_VERSION = "2.34.0";
 const DEFAULT_SETTINGS = {
   mode: "demo", apiKey: "", refresh: 60,
   theme: "dark", accent: "amber",
@@ -1146,6 +1146,27 @@ async function tornFaction(selections){
   if(!key) { const e = new Error("No API key set"); e.code = -1; throw e; }
   return tornFetch(`${API}/faction/?selections=${selections}&key=${encodeURIComponent(key)}&comment=lumbercorp2`);
 }
+/* Bars with a fallback path. Torn gates the `bars` selection by key access
+   level (current docs list it as "minimal"), so a public-level key gets an
+   access error. If v1 refuses but a v2 proxy is configured (Rank Wars /
+   Bazaar card, or Settings), retry through it — the proxy speaks v2, whose
+   /user/bars can succeed where the v1 path is refused. Bad key (code 2)
+   still aborts immediately. */
+async function tornBars(){
+  let firstErr = null;
+  try{ return await tornUser("bars"); }
+  catch(e){ firstErr = e; if(e.code === 2) throw e; }
+  const base = (typeof bzApiBase === "function" ? (bzApiBase() || "") : "").trim();
+  if(base && (settings.apiKey || "").trim()){
+    try{
+      const r = await fetch(base + "/api/torn?path=" + encodeURIComponent("/user/bars")
+        + "&key=" + encodeURIComponent(settings.apiKey.trim()), { cache: "no-store" });
+      const j = await r.json();
+      if(j && j.bars) return j;
+    }catch(e2){ /* fall through with the original error */ }
+  }
+  throw firstErr;
+}
 
 /* Poll live data — one independent call per selection group.
    Torn access levels differ per selection (basic/profile: public · bars:
@@ -1165,7 +1186,8 @@ const LIVE_PARTS = [
 async function loadLive(){
   if(state.mode !== "live") return;
   const parts = await Promise.all(LIVE_PARTS.map(async ([name, sel]) => {
-    try{ return { name, data: await tornUser(sel), err: null }; }
+    const fn = name === "bars" ? tornBars : tornUser;
+    try{ return { name, data: await fn(sel), err: null }; }
     catch(e){ return { name, data: null, err: e }; }
   }));
   const byName = {};
@@ -1523,7 +1545,7 @@ function renderBars(){
       <div class="track"><div class="fill ${k}" data-fill="${k}" style="width:${pct}%"></div></div>
     </div>`;
   }).join("") + (barsBlocked
-    ? `<div class="updated" style="color:var(--warn)">🔒 Torn won't serve bars to this key's access level — create a key with <b>minimal</b> access at Torn → Preferences → API keys and paste it in Settings.</div>`
+    ? `<div class="updated" style="color:var(--warn)">🔒 Torn won't serve bars to this key's access level (bars need <b>minimal</b>). Fix: Torn → Preferences → API keys → create a <b>minimal</b> (or higher) key and paste it in Settings — or set a proxy server below so the app can retry through v2.</div>`
     : "");
 }
 function renderActions(){
@@ -1909,6 +1931,29 @@ function renderDiagBtns(){
       b.disabled = false; b.textContent = "Test " + sel;
     });
     box.appendChild(b);
+  }
+  if(!box.dataset.keyProbe){
+    box.dataset.keyProbe = "1";
+    const kb = document.createElement("button");
+    kb.className = "btn sm";
+    kb.textContent = "🔑 What can my key read?";
+    kb.addEventListener("click", async () => {
+      kb.disabled = true; kb.textContent = "…";
+      const probes = [
+        ["profile", "public"], ["bars", "minimal"], ["cooldowns", ""],
+        ["travel", ""], ["money", "limited"], ["networth", "limited"], ["personalstats", "limited"]
+      ];
+      const out = [];
+      for(const [sel, lvl] of probes){
+        const r = await diagSelection(sel);
+        out.push(`<span style="color:${r.ok ? "var(--ok)" : "var(--bad)"}">${r.ok ? "✅" : "⛔"}</span> ${escHtml(sel)}${lvl ? ` <i>(${lvl})</i>` : ""}`);
+      }
+      const line = document.createElement("div");
+      line.innerHTML = "<b>Key capabilities:</b> " + out.join(" · ");
+      $("diagOut").prepend(line);
+      kb.disabled = false; kb.textContent = "🔑 What can my key read?";
+    });
+    box.appendChild(kb);
   }
 }
 function renderActionsMgr(){

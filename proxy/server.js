@@ -36,7 +36,7 @@ function cacheSet(k, status, body) {
 const PATH_OK = [
   /^\/faction\/(basic|members|wars|warfareranked|rankedwars|rankedwarreport|attacks)$/,
   /^\/faction\/\d+\/(basic|members|wars|rankedwars|rankedwarreport|chain|attacks)$/,
-  /^\/user\/(basic|profile)$/,
+  /^\/user\/(basic|profile)$/,  /^\/user\/(bars|cooldowns|travel|money|networth|personalstats)$/,
 ];
 const PARAM_OK = new Set(['sort', 'from', 'to', 'limit', 'offset', 'cat', 'striptags', 'timestamp', 'filters']);
 
