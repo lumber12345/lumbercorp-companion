@@ -870,7 +870,7 @@ function flagEmoji(cc){
 }
 
 /* ---------- settings ---------- */
-const APP_VERSION = "2.39.0";
+const APP_VERSION = "2.40.0";
 const DEFAULT_SETTINGS = {
   mode: "demo", apiKey: "", refresh: 60,
   theme: "dark", accent: "amber",
@@ -1617,7 +1617,8 @@ function renderBars(){
       " · synced=" + (state.liveSynced ? "yes" : "no") +
       " · caps=" + escHtml(JSON.stringify(state.caps || null)) +
       " · lastErr=" + escHtml(state.liveErrKey || "none") +
-      ` <button class="btn sm" id="btnBarsDebug" style="margin-left:6px">📋 Copy debug</button>`;
+      ` <button class="btn sm" id="btnBarsDebug" style="margin-left:6px">📋 Copy debug</button>` +
+      ` <button class="btn sm" id="btnBarsSend" style="margin-left:4px">📤 Send to agent</button>`;
     probeOut.parentNode.insertBefore(strip, probeOut.nextSibling);
     const db = strip.querySelector("#btnBarsDebug");
     if(db) db.addEventListener("click", () => {
@@ -1634,6 +1635,31 @@ function renderBars(){
         const ta = document.createElement("textarea"); ta.value = dump; document.body.appendChild(ta);
         ta.select(); try{ document.execCommand("copy"); done(); }catch(e2){} ta.remove();
       }
+    });
+    const sb = strip.querySelector("#btnBarsSend");
+    if(sb) sb.addEventListener("click", async () => {
+      let base = pushBase();
+      if(!base){
+        base = prompt("Backend URL to send the debug report to\n(the proxy preview address, https://…e2b.app or your Render proxy):", "");
+        if(!base) return;
+        base = base.trim().replace(/\/$/, "");
+      }
+      const dump = JSON.stringify({
+        version: APP_VERSION, ua: (navigator.userAgent || "").slice(0, 80),
+        mode: state.mode, key: km ? km.slice(0,4) + "…" + km.slice(-4) + " (" + km.length + " chars)" : null,
+        liveSynced: state.liveSynced, liveErrKey: state.liveErrKey || null,
+        caps: state.caps || null, bars: state.user && state.user.bars ? state.user.bars : null,
+        lastRaw: state.lastRaw || null, refresh: settings.refresh
+      });
+      sb.disabled = true; sb.textContent = "…";
+      try{
+        const r = await fetch(base + "/api/debug", { method: "POST", headers: { "Content-Type": "application/json" }, body: dump });
+        const j = await r.json();
+        if(j && j.ok){ sb.textContent = "✓ Sent"; toast("📤 Debug report delivered", "ok"); }
+        else { sb.textContent = "📤 Send to agent"; toast("Send failed: " + ((j && j.error && j.error.error) || ("HTTP " + r.status)), "warn"); }
+      }catch(e){ sb.textContent = "📤 Send to agent"; toast("Send failed: " + (e.message || e), "warn"); }
+      sb.disabled = false;
+      setTimeout(() => { sb.textContent = "📤 Send to agent"; sb.disabled = false; }, 4000);
     });
   }
   const fixBtn = document.getElementById("btnBarsFix");

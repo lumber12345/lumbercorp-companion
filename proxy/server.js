@@ -740,6 +740,32 @@ const server = http.createServer(async (req, res) => {
   }
   if (u.pathname === '/api/ping') return send(res, 200, { ok: true, ts: Date.now() });
 
+  /* ---- debug intake: the app POSTs its diagnostic dump here so the
+          maintainer can read it from the workspace file ---- */
+  if (req.method === 'POST' && p === '/api/debug') {
+    const raw = await readBody(req, 100e3);
+    try {
+      const fs = require('fs'), path = require('path');
+      const file = path.join(__dirname, '..', 'debug-reports.jsonl');
+      const line = JSON.stringify({ ts: new Date().toISOString(), report: JSON.parse(raw) }) + '\n';
+      let lines = [];
+      try { lines = fs.readFileSync(file, 'utf8').trim().split('\n').slice(-49); } catch (e) { /* fresh */ }
+      lines.push(line);
+      fs.writeFileSync(file, lines.join('\n'));
+      return send(res, 200, { ok: true, received: new Date().toISOString() });
+    } catch (e) {
+      return send(res, 500, { error: { error: 'could not store report: ' + (e.message || e) } });
+    }
+  }
+  if (p === '/api/debug') {
+    try {
+      const file = require('path').join(__dirname, '..', 'debug-reports.jsonl');
+      const txt = require('fs').readFileSync(file, 'utf8').trim();
+      const last = txt.split('\n').pop();
+      return send(res, 200, { last: JSON.parse(last) });
+    } catch (e) { return send(res, 404, { error: { error: 'no reports yet' } }); }
+  }
+
   /* ---- web push (installed PWA background alerts) ---- */
   if (p === '/api/push/key') return send(res, 200, { publicKey: b64u(vapid.rawPub) });
   if (p === '/api/push/status') return send(res, 200, { ok: true, count: subs.size, pollMs: PUSH_POLL_MS });
