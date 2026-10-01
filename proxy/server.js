@@ -11,6 +11,7 @@
 const http = require('http');
 const https = require('https');
 const { URL } = require('url');
+const crypto = require('crypto');
 
 const TORN_BASE = process.env.TORN_BASE || 'api.torn.com';
 const TORN_PORT = Number(process.env.TORN_PORT) || 443;
@@ -571,6 +572,160 @@ function readBody(req, limit = 10e3) {
   });
 }
 
+/* ------------------------------------------------- web push (installed PWA)
+ * Zero-dependency web push (RFC 8291 aes128gcm + RFC 8292 VAPID) so the
+ * installed phone app gets background alerts: energy full, hospital out,
+ * flight landed, life critical. One Torn v1 poll per subscriber per 2 min.
+ * Subscriptions + poll key + VAPID key persist to PUSH_DB (default /tmp —
+ * memory-only semantics like everything else; survives restarts only when
+ * the disk does). Browsers re-subscribe automatically when the VAPID key
+ * changes. Env: PUSH_DB, VAPID_SUB, PUSH_POLL_MS.
+ */
+const PUSH_DB = process.env.PUSH_DB || '/tmp/lc2-push-subs.json';
+const VAPID_SUB = process.env.VAPID_SUB || 'mailto:lumbercorp2@users.noreply.github.com';
+const PUSH_POLL_MS = Number(process.env.PUSH_POLL_MS) || 120e3;
+const b64u = (b) => Buffer.from(b).toString('base64url');
+const hkdf = (ikm, salt, info, len) => Buffer.from(crypto.hkdfSync('sha256', ikm, salt, info, len));
+
+let vapid = null;      /* { rawPub (65B), d (32B) } */
+let subs = new Map();  /* endpoint -> { endpoint, p256dh, auth, tornKey, flags, fails } */
+function saveDb() {
+  try {
+    require('fs').writeFileSync(PUSH_DB, JSON.stringify({
+      vapid: { rawPub: vapid.rawPub.toString('base64'), d: vapid.d.toString('base64') },
+      subs: [...subs.values()].map(({ endpoint, p256dh, auth, tornKey }) => ({ endpoint, p256dh, auth, tornKey })),
+    }));
+  } catch (e) { /* best effort */ }
+}
+(function loadDb() {
+  try {
+    const db = JSON.parse(require('fs').readFileSync(PUSH_DB, 'utf8'));
+    if (db.vapid && db.vapid.rawPub && db.vapid.d) vapid = { rawPub: Buffer.from(db.vapid.rawPub, 'base64'), d: Buffer.from(db.vapid.d, 'base64') };
+    (db.subs || []).forEach((s) => subs.set(s.endpoint, Object.assign({ flags: {}, fails: 0 }, s)));
+  } catch (e) { /* fresh start */ }
+  if (!vapid) {
+    const kp = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+    const j = kp.publicKey.export({ format: 'jwk' });
+    vapid = {
+      rawPub: Buffer.concat([Buffer.from([4]), Buffer.from(j.x, 'base64url'), Buffer.from(j.y, 'base64url')]),
+      d: Buffer.from(kp.privateKey.export({ format: 'jwk' }).d, 'base64url'),
+    };
+    saveDb();
+  }
+})();
+function vapidPrivKey() {
+  return crypto.createPrivateKey({
+    key: { kty: 'EC', crv: 'P-256', x: vapid.rawPub.subarray(1, 33).toString('base64url'), y: vapid.rawPub.subarray(33, 65).toString('base64url'), d: vapid.d.toString('base64url') },
+    format: 'jwk',
+  });
+}
+function derToRaw(sig) { /* ASN.1 DER ECDSA signature -> 64-byte r||s */
+  const rLen = sig[3];
+  const rest = sig.subarray(4 + rLen);
+  const sLen = rest[1];
+  const r = sig.subarray(4, 4 + rLen), s = rest.subarray(2, 2 + sLen);
+  const out = Buffer.alloc(64);
+  r.copy(out, 32 - Math.min(32, r.length), Math.max(0, r.length - 32));
+  s.copy(out, 64 - Math.min(32, s.length), Math.max(0, s.length - 32));
+  return out;
+}
+function vapidAuth(endpoint) { /* RFC 8292 Authorization header */
+  const aud = new URL(endpoint).origin;
+  const head = b64u(JSON.stringify({ typ: 'JWT', alg: 'ES256' }));
+  const body = b64u(JSON.stringify({ aud, exp: Math.floor(Date.now() / 1e3) + 12 * 3600, sub: VAPID_SUB }));
+  const der = crypto.sign('sha256', Buffer.from(head + '.' + body), vapidPrivKey());
+  return 'vapid t=' + head + '.' + body + '.' + b64u(derToRaw(der)) + ', k=' + b64u(vapid.rawPub);
+}
+function encryptFor(sub, text) { /* RFC 8291 aes128gcm */
+  const clientPub = Buffer.from(sub.p256dh, 'base64url');
+  const auth = Buffer.from(sub.auth, 'base64url');
+  const as = crypto.createECDH('prime256v1');
+  as.generateKeys();
+  const asPub = as.getPublicKey();
+  const prk = hkdf(as.computeSecret(clientPub), auth, Buffer.concat([Buffer.from('WebPush: info\0'), clientPub, asPub]), 32);
+  const salt = crypto.randomBytes(16);
+  const cek = hkdf(prk, salt, Buffer.from('Content-Encoding: aes128gcm\0'), 16);
+  const nonce = hkdf(prk, salt, Buffer.from('Content-Encoding: nonce\0'), 12);
+  const pt = Buffer.concat([Buffer.from(text, 'utf8'), Buffer.from([2])]);
+  const cipher = crypto.createCipheriv('aes-128-gcm', cek, nonce);
+  const ct = Buffer.concat([cipher.update(pt), cipher.final(), cipher.getAuthTag()]);
+  const rs = Buffer.alloc(4); rs.writeUInt32BE(4096);
+  const header = Buffer.concat([salt, rs, Buffer.from([asPub.length]), asPub]);
+  return Buffer.concat([header, ct]);
+}
+async function sendPush(sub, note) {
+  const payload = encryptFor(sub, JSON.stringify(Object.assign({ title: '🪵 LumberCorp 2.0', body: '', tag: 'lc2', url: './index.html?from=push' }, note)));
+  const r = await fetch(sub.endpoint, {
+    method: 'POST',
+    headers: {
+      TTL: '86400',
+      Urgency: 'normal',
+      Authorization: vapidAuth(sub.endpoint),
+      'Content-Type': 'application/octet-stream',
+      'Content-Encoding': 'aes128gcm',
+    },
+    body: new Uint8Array(payload),
+  });
+  return r.status;
+}
+async function notifySub(sub, note) {
+  try {
+    const st = await sendPush(sub, note);
+    if (st === 404 || st === 410) { subs.delete(sub.endpoint); saveDb(); }
+  } catch (e) {
+    sub.fails = (sub.fails || 0) + 1;
+    if (sub.fails > 20) { subs.delete(sub.endpoint); saveDb(); }
+  }
+}
+async function pollSub(sub) {
+  let j;
+  try {
+    const qs = new URLSearchParams({ selections: 'bars,travel,hospital', key: sub.tornKey, comment: 'LumberCorp2' });
+    const r = await fetch(TORN_PROTOCOL + '://' + TORN_BASE + '/user/?' + qs.toString(), { signal: AbortSignal.timeout(12e3) });
+    j = JSON.parse(await r.text());
+  } catch (e) {
+    sub.fails = (sub.fails || 0) + 1;
+    if (sub.fails > 20) { subs.delete(sub.endpoint); saveDb(); }
+    return;
+  }
+  if (!j || j.error) {
+    if (j && j.error && j.error.code === 2 && sub.tornKey) {
+      sub.tornKey = ''; saveDb();
+      notifySub(sub, { title: '⚠️ Push paused', body: 'Your Torn API key was rejected — open the app and re-enable push.', tag: 'lc2-key' });
+    }
+    return;
+  }
+  sub.fails = 0;
+  const f = sub.flags || (sub.flags = {});
+  const notes = [];
+  const nowS = Math.floor(Date.now() / 1e3);
+  const en = j.bars && j.bars.energy;
+  if (en) {
+    if (en.fulltime === 0 && en.current >= en.maximum) {
+      if (!f.energyFull) { f.energyFull = true; notes.push({ title: '⚡ Energy full', body: en.current + '/' + en.maximum + ' — time to hit the chainsaw.', tag: 'lc2-energy' }); }
+    } else if (en.current < en.maximum) f.energyFull = false;
+  }
+  const life = j.bars && j.bars.life;
+  if (life) {
+    if (life.current < 0.25 * life.maximum) {
+      if (!f.lifeLow) { f.lifeLow = true; notes.push({ title: '🩸 Life critical', body: life.current + '/' + life.maximum + ' — patch up!', tag: 'lc2-life' }); }
+    } else if (life.current >= 0.5 * life.maximum) f.lifeLow = false;
+  }
+  if (j.hospital) {
+    if (j.hospital.time > nowS) f.hospNoted = true;
+    else if (f.hospNoted) { f.hospNoted = false; notes.push({ title: '🏥 Out of hospital', body: 'Patched up and released.', tag: 'lc2-hosp' }); }
+  }
+  if (j.travel) {
+    if (j.travel.time > nowS) f.travNoted = true;
+    else if (f.travNoted) { f.travNoted = false; notes.push({ title: '🛬 Flight landed', body: j.travel.destination && j.travel.destination !== 'Torn' ? 'Arrived in ' + j.travel.destination + '.' : 'Back in Torn.', tag: 'lc2-travel' }); }
+  }
+  for (const n of notes) await notifySub(sub, n);
+  if (notes.length) saveDb();
+}
+function pollOnce() {
+  for (const sub of [...subs.values()]) if (sub.tornKey) pollSub(sub).catch(() => {});
+}
+
 /* ---------------------------------------------------------------- server */
 const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, 'http://x');
@@ -578,12 +733,44 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') {           // CORS preflight
     res.writeHead(204, {
       'access-control-allow-origin': '*',
-      'access-control-allow-methods': 'GET, OPTIONS',
-      'access-control-allow-headers': 'content-type',
+      'access-control-allow-methods': 'GET, POST, DELETE, OPTIONS',
+      'access-control-allow-headers': 'content-type, authorization',
     });
     return res.end();
   }
   if (u.pathname === '/api/ping') return send(res, 200, { ok: true, ts: Date.now() });
+
+  /* ---- web push (installed PWA background alerts) ---- */
+  if (p === '/api/push/key') return send(res, 200, { publicKey: b64u(vapid.rawPub) });
+  if (p === '/api/push/status') return send(res, 200, { ok: true, count: subs.size, pollMs: PUSH_POLL_MS });
+  if (req.method === 'POST' && p === '/api/push/subscribe') {
+    const raw = await readBody(req);
+    let b; try { b = JSON.parse(raw); } catch (e) { return send(res, 400, { error: { error: 'bad json' } }); }
+    const s = b && b.subscription;
+    if (!s || !s.endpoint || !s.keys || !s.keys.p256dh || !s.keys.auth) return send(res, 400, { error: { error: 'bad subscription' } });
+    subs.set(s.endpoint, { endpoint: s.endpoint, p256dh: s.keys.p256dh, auth: s.keys.auth, tornKey: String(b.tornKey || '').trim(), flags: {}, fails: 0 });
+    saveDb();
+    return send(res, 200, { ok: true, count: subs.size });
+  }
+  if (req.method === 'POST' && p === '/api/push/unsubscribe') {
+    const raw = await readBody(req);
+    try { const b = JSON.parse(raw); if (b && b.endpoint) { subs.delete(b.endpoint); saveDb(); } } catch (e) { /* ignore */ }
+    return send(res, 200, { ok: true, count: subs.size });
+  }
+  if (req.method === 'POST' && p === '/api/push/test') {
+    const raw = await readBody(req).catch(() => '{}');
+    let endpoint = null; try { endpoint = (JSON.parse(raw) || {}).endpoint || null; } catch (e) { /* all */ }
+    const targets = [...subs.values()].filter((s) => !endpoint || s.endpoint === endpoint);
+    if (!targets.length) return send(res, 404, { error: { error: 'no subscriptions on this server' } });
+    const results = [];
+    for (const s of targets) {
+      try {
+        const st = await sendPush(s, { title: '🔔 LumberCorp 2.0', body: 'Test push — the pipe works. Background alerts are live.', tag: 'lc2-test' });
+        results.push({ endpoint: s.endpoint.slice(-16), ok: st >= 200 && st < 300, status: st });
+      } catch (e) { results.push({ endpoint: s.endpoint.slice(-16), ok: false, error: String(e.message || e) }); }
+    }
+    return send(res, 200, { results });
+  }
 
   if (u.pathname === '/api/ffscouter') {
     const key = u.searchParams.get('key') || '';
@@ -722,4 +909,6 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`[lumbercorp2-proxy] listening on http://0.0.0.0:${PORT}`);
   scanLoop();
   pricesLoop();
+  pollOnce();
+  setInterval(pollOnce, PUSH_POLL_MS);
 });

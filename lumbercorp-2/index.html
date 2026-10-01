@@ -697,6 +697,16 @@
             <button class="btn sm" id="btnTestKey">Test</button>
           </div>
         </div>
+        <div class="setrow" style="flex-direction:column;align-items:stretch;gap:9px">
+          <div><div class="st">📱 Install &amp; push</div><div class="sd">Install LumberCorp on your phone, then get background alerts even when the app is closed — ⚡ energy full · 🏥 hospital out · 🛬 flight landed · 🩸 life critical</div></div>
+          <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center">
+            <button class="btn sm" id="btnInstall" hidden>📲 Install app</button>
+            <button class="btn sm" id="btnPush">🔔 Enable push</button>
+            <button class="btn sm" id="btnPushTest" hidden>📣 Send test</button>
+          </div>
+          <div id="pushStat" style="font-size:12px;color:var(--muted);line-height:1.6"></div>
+          <div id="pushIosNote" hidden style="font-size:12px;color:var(--warn);line-height:1.6">iPhone: first tap <b>Share → Add to Home Screen</b>, then open LumberCorp from the home-screen icon and enable push there — iOS only allows push inside the installed app.</div>
+        </div>
         <div class="setrow">
           <div><div class="st">Refresh interval</div><div class="sd">How often live data re-polls</div></div>
           <select id="setRefresh" style="margin-left:auto;background:var(--card2);border:1px solid var(--border2);border-radius:10px;padding:8px 10px;font-weight:600">
@@ -860,7 +870,7 @@ function flagEmoji(cc){
 }
 
 /* ---------- settings ---------- */
-const APP_VERSION = "2.31.0";
+const APP_VERSION = "2.32.0";
 const DEFAULT_SETTINGS = {
   mode: "demo", apiKey: "", refresh: 60,
   theme: "dark", accent: "amber",
@@ -2618,6 +2628,102 @@ function wire(){
     renderAlertBadge(); renderActivity(); renderActPreview();
     toast("Activity cleared", "ok");
   });
+
+  // install & push
+  let deferredInstall = null;
+  window.addEventListener("beforeinstallprompt", e => {
+    e.preventDefault(); deferredInstall = e;
+    const b = $("btnInstall"); if (b) b.hidden = false;
+  });
+  window.addEventListener("appinstalled", () => { toast("📲 Installed — find LumberCorp on your home screen", "ok"); renderPushStat(); });
+  const IS_IOS = /iphone|ipad|ipod/i.test(navigator.userAgent || "");
+  const IS_STANDALONE = (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true;
+  const pushBase = () => (bzApiBase() || "").trim();
+  function urlB64ToU8(b64){
+    const pad = "=".repeat((4 - (b64.length % 4)) % 4);
+    const raw = atob((b64 + pad).replace(/-/g, "+").replace(/_/g, "/"));
+    return Uint8Array.from(raw, c => c.charCodeAt(0));
+  }
+  const bytesB64 = (u8) => btoa(Array.from(u8).map(c => String.fromCharCode(c)).join(""));
+  async function renderPushStat(extra){
+    const el = $("pushStat"); if(!el) return;
+    if(!("PushManager" in window) || !("Notification" in window)){
+      el.textContent = "Web push is not supported in this browser.";
+      $("btnPush").hidden = true; return;
+    }
+    if(IS_IOS && !IS_STANDALONE) $("pushIosNote").hidden = false;
+    const perm = Notification.permission;
+    let sub = null;
+    try {
+      const reg = await navigator.serviceWorker.getRegistration();
+      sub = reg ? await reg.pushManager.getSubscription() : null;
+    } catch(e){}
+    $("btnPush").textContent = sub ? "🔕 Turn push off" : "🔔 Enable push";
+    $("btnPushTest").hidden = !sub;
+    const base = pushBase();
+    const bits = [
+      perm === "granted" ? "✅ Notifications allowed" : perm === "denied" ? "⛔ Notifications blocked — allow them in your browser settings" : "• Notifications not asked yet",
+      sub ? "✅ Subscribed — background alerts are live" : "• Not subscribed yet",
+      base ? "🖥️ Server: " + base.replace(/^https?:\/\//, "") : "⚠️ No proxy server set — paste one in the Rank Wars / Bazaar card, or deploy yours from the zip"
+    ];
+    el.innerHTML = bits.map(b => "<div>" + b + "</div>").join("") + (extra ? "<div>" + extra + "</div>" : "");
+  }
+  $("btnPush").addEventListener("click", async () => {
+    if(!("PushManager" in window)){ toast("This browser has no web push", "warn"); return; }
+    if(IS_IOS && !IS_STANDALONE){ $("pushIosNote").hidden = false; toast("Add to Home Screen first, then open from the icon", "warn"); return; }
+    const base = pushBase();
+    if(!base){ toast("Set a proxy server first (Rank Wars card in Settings)", "warn"); return; }
+    try{
+      const reg = (await navigator.serviceWorker.getRegistration()) || await navigator.serviceWorker.register("sw.js").catch(() => null);
+      if(!reg){ toast("Service worker not ready — reload and retry", "warn"); return; }
+      const perm = await Notification.requestPermission();
+      if(perm !== "granted"){ toast("Notifications blocked — allow them in browser settings", "warn"); renderPushStat(); return; }
+      const keyRes = await fetch(base + "/api/push/key").then(r => r.json());
+      if(!keyRes.publicKey) throw new Error("server returned no VAPID key");
+      let sub = await reg.pushManager.getSubscription();
+      const want = bytesB64(urlB64ToU8(keyRes.publicKey));
+      if(sub){
+        const cur = sub.options && sub.options.applicationServerKey;
+        if(!cur || bytesB64(new Uint8Array(cur)) !== want){ await sub.unsubscribe(); sub = null; }
+      }
+      if(!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToU8(keyRes.publicKey) });
+      const r2 = await fetch(base + "/api/push/subscribe", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subscription: sub.toJSON(), tornKey: (settings.apiKey || "").trim() })
+      }).then(r => r.json());
+      if(r2 && r2.ok){
+        toast("🔔 Push enabled — alerts even when the app is closed", "ok");
+        logAct("🔔", "Push notifications enabled");
+      } else toast("Server refused the subscription", "warn");
+      renderPushStat();
+    }catch(err){
+      try { const reg = await navigator.serviceWorker.getRegistration(); const old = reg && await reg.pushManager.getSubscription(); if(old) await old.unsubscribe(); } catch(e2){}
+      toast("Push failed: " + (err.message || err), "warn");
+      renderPushStat();
+    }
+  });
+  $("btnPushTest").addEventListener("click", async () => {
+    const base = pushBase(); if(!base) return;
+    try{
+      const reg = await navigator.serviceWorker.getRegistration();
+      const sub = reg && await reg.pushManager.getSubscription();
+      const r = await fetch(base + "/api/push/test", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ endpoint: sub && sub.endpoint })
+      }).then(r => r.json());
+      const res = r && r.results && r.results[0];
+      if(res && res.ok) toast("📣 Test sent — check your notifications", "ok");
+      else toast("Test failed: " + ((res && (res.error || "HTTP " + res.status)) || "no subscription"), "warn");
+    }catch(e){ toast("Test failed: " + (e.message || e), "warn"); }
+  });
+  $("btnInstall").addEventListener("click", async () => {
+    if(!deferredInstall){ toast("Use the browser menu → “Add to Home screen” / “Install app”", "warn"); return; }
+    deferredInstall.prompt();
+    try { await deferredInstall.userChoice; } catch(e){}
+    deferredInstall = null; $("btnInstall").hidden = true;
+  });
+  renderPushStat();
+  if(navigator.serviceWorker && navigator.serviceWorker.ready) navigator.serviceWorker.ready.then(() => renderPushStat()).catch(() => {});
 
   // settings
   document.querySelectorAll("[data-mode]").forEach(b =>
